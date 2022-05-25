@@ -118,6 +118,7 @@ const (
 	ResourceNotFound                             = "ResourceNotFound"
 	ResourcePatchError                           = "ResourcePatchError"
 	ResourceReadError                            = "ResourceReadError"
+	ResourceRenderingError                       = "ResourceRenderingError"
 	ResourceScalingError                         = "ResourceScalingError"
 	ResourceUpdateError                          = "ResourceUpdateError"
 	ResourceValidationError                      = "ResourceValidationError"

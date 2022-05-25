@@ -880,7 +880,7 @@ func hasPendingCSRUsingCertV1beta1(ctx context.Context, cli client.Client, label
 	return false, nil
 }
 
-func UpdateStatusCondition(statuscondition []metav1.Condition, conditions []operator.TigeraStatusCondition, generation int64) {
+func UpdateStatusCondition(statuscondition []metav1.Condition, conditions []operator.TigeraStatusCondition, generation int64) []metav1.Condition {
 	if statuscondition == nil {
 		statuscondition = []metav1.Condition{}
 	}
@@ -923,6 +923,7 @@ func UpdateStatusCondition(statuscondition []metav1.Condition, conditions []oper
 				if !reflect.DeepEqual(c.Status, condition.Status) {
 					ic.LastTransitionTime = metav1.NewTime(time.Now())
 				}
+
 				statuscondition[i] = ic
 				found = true
 			}
@@ -932,4 +933,5 @@ func UpdateStatusCondition(statuscondition []metav1.Condition, conditions []oper
 			statuscondition = append(statuscondition, ic)
 		}
 	}
+	return statuscondition
 }
