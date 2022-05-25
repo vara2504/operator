@@ -752,6 +752,7 @@ func (r *ReconcileInstallation) Reconcile(ctx context.Context, request reconcile
 
 	// Changes for updating installation status conditions
 	if request.Name == InstallationName && request.Namespace == "" {
+
 		ts := &operator.TigeraStatus{}
 		err := r.client.Get(ctx, types.NamespacedName{Name: InstallationName}, ts)
 		if err != nil {
