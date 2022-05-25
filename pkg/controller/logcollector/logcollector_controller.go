@@ -256,7 +256,6 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		if err := r.client.Status().Update(ctx, instance); err != nil {
 			log.WithValues("reason", err).Info("Failed to create logcollector status conditions.")
@@ -273,7 +272,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 	}
 
 	if !r.licenseAPIReady.IsReady() {
-		r.SetDegraded(operatorv1.ResourceNotReady, "Waiting for LicenseKeyAPI to be ready", err, reqLogger)
+		r.status.SetDegraded(operatorv1.ResourceNotReady, "Waiting for LicenseKeyAPI to be ready")
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
@@ -359,7 +358,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 
 	var exportLogs = utils.IsFeatureActive(license, common.ExportLogsFeature)
 	if !exportLogs && instance.Spec.AdditionalStores != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Feature is not active - License does not support feature: export-logs", err, reqLogger)
+		r.status.SetDegraded(operatorv1.ResourceValidationError, "Feature is not active - License does not support feature: export-logs")
 		return reconcile.Result{}, err
 	}
 
