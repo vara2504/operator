@@ -393,7 +393,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 	} else if ls != nil && ls.DeletionTimestamp == nil && managementClusterConnection != nil {
 		// Note that we check if the DeletionTimestamp is set as the render function is responsible for any cleanup needed
 		// before the LogStorage CR can be deleted, and removing the finalizers from that CR
-		r.SetDegraded(operatorv1.ResourceValidationError, "cluster type is managed but LogStorage CR still exists", err, reqLogger)
+		r.status.SetDegraded(operatorv1.ResourceValidationError, "LogStorage validation failed - cluster type is managed but LogStorage CR still exists")
 		return reconcile.Result{}, nil
 	}
 

@@ -269,7 +269,7 @@ var _ = Describe("LogStorage controller", func() {
 					It("returns an error if the LogStorage resource exists and is not marked for deletion", func() {
 						r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
 						Expect(err).ShouldNot(HaveOccurred())
-						mockStatus.On("SetDegraded", "LogStorage validation failed", "cluster type is managed but LogStorage CR still exists").Return()
+						mockStatus.On("SetDegraded", operatorv1.ResourceValidationError, "LogStorage validation failed - cluster type is managed but LogStorage CR still exists").Return()
 						result, err := r.Reconcile(ctx, reconcile.Request{})
 						Expect(result).Should(Equal(reconcile.Result{}))
 						Expect(err).ShouldNot(HaveOccurred())
