@@ -217,7 +217,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 		}
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		if err := r.client.Status().Update(ctx, instance); err != nil {
-			log.WithValues("reason", err).Info("Failed to create logcollector status conditions.")
+			log.WithValues("reason", err).Info("Failed to create compliance status conditions.")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil

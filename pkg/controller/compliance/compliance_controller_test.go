@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Tigera, Inc. All rights reserved.
+// Copyright (c) 2020-2022 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
 
 	relasticsearch "github.com/tigera/operator/pkg/render/common/elasticsearch"
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
@@ -589,6 +591,42 @@ var _ = Describe("Compliance controller tests", func() {
 		AfterEach(func() {
 			By("Deleting the previous license")
 			Expect(c.Delete(ctx, &v3.LicenseKey{ObjectMeta: metav1.ObjectMeta{Name: "default"}, Status: v3.LicenseKeyStatus{Features: []string{}}})).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("Reconcile for Condition status", func() {
+		It("should reconcile with creating new status condition with one item", func() {
+			ts := &operatorv1.TigeraStatus{
+				ObjectMeta: metav1.ObjectMeta{Name: "compliance"},
+				Spec:       operatorv1.TigeraStatusSpec{},
+				Status: operatorv1.TigeraStatusStatus{
+					Conditions: []operatorv1.TigeraStatusCondition{
+						{
+							Type:    operatorv1.ComponentAvailable,
+							Status:  operatorv1.ConditionTrue,
+							Reason:  string(operatorv1.AllObjectsAvailable),
+							Message: "All Objects are available",
+						},
+					},
+				},
+			}
+			Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
+
+			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name:      "compliance",
+				Namespace: "",
+			}})
+
+			instance, err := GetCompliance(ctx, r.client)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			Expect(instance.Status.Conditions).To(HaveLen(1))
+
+			//Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
+			//Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+			//Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
+			//Expect(instance.Status.Conditions[0].Message).To(Equal("All Objects are available"))
+			//Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
 		})
 	})
 })
