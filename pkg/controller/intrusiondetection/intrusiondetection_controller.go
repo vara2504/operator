@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Tigera, Inc. All rights reserved.
+// Copyright (c) 2020-2022 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/types"
 
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
 	operatorv1 "github.com/tigera/operator/api/v1"
@@ -50,6 +53,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+const IntrusionDetectionName = "intrusion-detection"
 
 var log = logf.Log.WithName("controller_intrusiondetection")
 
@@ -176,6 +181,12 @@ func add(mgr manager.Manager, c controller.Controller) error {
 		return fmt.Errorf("intrusiondetection-controller failed to watch the ConfigMap resource: %v", err)
 	}
 
+	// Watch for changes to TigeraStatus.
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: IntrusionDetectionName}}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return fmt.Errorf("intrusiondetection-controller failed to watch intrusion-detection Tigerastatus: %w", err)
+	}
+
 	return nil
 }
 
@@ -216,37 +227,50 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 			r.status.OnCRNotFound()
 			return reconcile.Result{}, nil
 		}
-		reqLogger.V(3).Info("failed to get IntrusionDetection CR", "err", err)
-		r.status.SetDegraded("Error querying IntrusionDetection", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Error querying IntrusionDetection", err, reqLogger)
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 	r.status.OnCRFound()
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
+	// Changes for updating compliance status conditions
+	if request.Name == IntrusionDetectionName && request.Namespace == "" {
+		ts := &operatorv1.TigeraStatus{}
+		err := r.client.Get(ctx, types.NamespacedName{Name: IntrusionDetectionName}, ts)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
+		if err := r.client.Status().Update(ctx, instance); err != nil {
+			log.WithValues("reason", err).Info("Failed to create compliance status conditions.")
+			return reconcile.Result{}, err
+		}
+		return reconcile.Result{}, nil
+	}
+
 	if err := r.setDefaultsOnIntrusionDetection(ctx, instance); err != nil {
-		log.Error(err, "Failed to set defaults on IntrusionDetection CR")
-		r.status.SetDegraded("Unable to set defaults on IntrusionDetection", err.Error())
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Unable to set defaults on IntrusionDetection", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if !utils.IsAPIServerReady(r.client, reqLogger) {
-		r.status.SetDegraded("Waiting for Tigera API server to be ready", "")
+		r.status.SetDegraded(operatorv1.ResourceNotReady, "Waiting for Tigera API server to be ready")
 		return reconcile.Result{}, err
 	}
 
 	if !r.licenseAPIReady.IsReady() {
-		r.status.SetDegraded("Waiting for LicenseKeyAPI to be ready", "")
+		r.status.SetDegraded(operatorv1.ResourceNotReady, "Waiting for LicenseKeyAPI to be ready")
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	license, err := utils.FetchLicenseKey(ctx, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.status.SetDegraded("License not found", err.Error())
+			r.SetDegraded(operatorv1.ResourceNotFound, "License not found", err, reqLogger)
 			return reconcile.Result{RequeueAfter: 10 * time.Second}, err
 		}
-		r.status.SetDegraded("Error querying license", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Error querying license", err, reqLogger)
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -254,18 +278,17 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	variant, network, err := utils.GetInstallation(context.Background(), r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.status.SetDegraded("Installation not found", err.Error())
+			r.SetDegraded(operatorv1.ResourceNotFound, "Installation not found", err, reqLogger)
 			return reconcile.Result{}, err
 		}
-		r.status.SetDegraded("Error querying installation", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Error querying installation", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	// Query for pull secrets in operator namespace
 	pullSecrets, err := utils.GetNetworkingPullSecrets(network, r.client)
 	if err != nil {
-		log.Error(err, "Error retrieving Pull secrets")
-		r.status.SetDegraded("Error retrieving pull secrets", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Error retrieving pull secrets", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -282,19 +305,16 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	esClusterConfig, err := utils.GetElasticsearchClusterConfig(context.Background(), r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Elasticsearch cluster configuration is not available, waiting for it to become available")
-			r.status.SetDegraded("Elasticsearch cluster configuration is not available, waiting for it to become available", err.Error())
+			r.SetDegraded(operatorv1.ResourceNotFound, "Elasticsearch cluster configuration is not available, waiting for it to become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
-		log.Error(err, "Failed to get the elasticsearch cluster configuration")
-		r.status.SetDegraded("Failed to get the elasticsearch cluster configuration", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get the elasticsearch cluster configuration", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	managementClusterConnection, err := utils.GetManagementClusterConnection(ctx, r.client)
 	if err != nil {
-		log.Error(err, "Failed to read ManagementClusterConnection")
-		r.status.SetDegraded("Failed to read ManagementClusterConnection", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to read ManagementClusterConnection", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -315,30 +335,27 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Elasticsearch secrets are not available yet, waiting until they become available")
-			r.status.SetDegraded("Elasticsearch secrets are not available yet, waiting until they become available", err.Error())
+			r.SetDegraded(operatorv1.ResourceNotFound, "Elasticsearch secrets are not available yet, waiting until they become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
-		r.status.SetDegraded("Failed to get Elasticsearch credentials", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch credentials", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	certificateManager, err := certificatemanager.Create(r.client, network, r.clusterDomain)
 	if err != nil {
-		log.Error(err, "unable to create the Tigera CA")
-		r.status.SetDegraded("Unable to create the Tigera CA", err.Error())
+		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	kibanaPublicCertSecret, err := certificateManager.GetCertificate(r.client, render.KibanaPublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		reqLogger.Error(err, "Failed to read Kibana public cert secret")
-		r.status.SetDegraded("Failed to read Kibana public cert secret", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to read Kibana public cert secret", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if !r.dpiAPIReady.IsReady() {
 		log.Info("Waiting for DeepPacketInspection API to be ready")
-		r.status.SetDegraded("Waiting for DeepPacketInspection API to be ready", "")
+		r.status.SetDegraded(operatorv1.ResourceNotReady, "Waiting for DeepPacketInspection API to be ready")
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
@@ -347,14 +364,13 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 
 	if managementClusterConnection == nil {
 		if esLicenseType, err = utils.GetElasticLicenseType(ctx, r.client, reqLogger); err != nil {
-			r.status.SetDegraded("Failed to get Elasticsearch license", err.Error())
+			r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch license", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
 		managerInternalTLSSecret, err := certificateManager.GetCertificate(r.client, render.ManagerInternalTLSSecretName, common.OperatorNamespace())
 		if err != nil {
-			log.Error(err, fmt.Sprintf("failed to retrieve / validate %s", render.ManagerInternalTLSSecretName))
-			r.status.SetDegraded(fmt.Sprintf("failed to retrieve / validate  %s", render.ManagerInternalTLSSecretName), err.Error())
+			r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("failed to retrieve / validate  %s", render.ManagerInternalTLSSecretName), err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
@@ -383,20 +399,18 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	comp := render.IntrusionDetection(intrusionDetectionCfg)
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-		reqLogger.Error(err, "Error with images from ImageSet")
-		r.status.SetDegraded("Error with images from ImageSet", err.Error())
+		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	typhaNodeTLS, err := installation.GetOrCreateTyphaNodeTLSConfig(r.client, certificateManager)
 	if err != nil {
-		log.Error(err, "Error with Typha/Felix secrets")
-		r.status.SetDegraded("Error with Typha/Felix secrets", err.Error())
+		r.SetDegraded(operatorv1.CertificateError, "Error with Typha/Felix secrets", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	dpiList := &v3.DeepPacketInspectionList{}
 	if err := r.client.List(ctx, dpiList); err != nil {
-		r.status.SetDegraded("Failed to retrieve DeepPacketInspection resource", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to retrieve DeepPacketInspection resource", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	hasNoDPIResource := len(dpiList.Items) == 0
@@ -433,21 +447,20 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, dpiComponent); err != nil {
-		reqLogger.Error(err, "Error with images from ImageSet")
-		r.status.SetDegraded("Error with images from ImageSet", err.Error())
+		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	for _, comp := range components {
 		if err := handler.CreateOrUpdateOrDelete(context.Background(), comp, r.status); err != nil {
-			r.status.SetDegraded("Error creating / updating resource", err.Error())
+			r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
 
 	if hasNoLicense {
 		log.V(4).Info("IntrusionDetection is not activated as part of this license")
-		r.status.SetDegraded("Feature is not active", "License does not support this feature")
+		r.status.SetDegraded(operatorv1.ResourceValidationError, "Feature is not active - License does not support this feature")
 		return reconcile.Result{}, nil
 	}
 
@@ -493,4 +506,9 @@ func (r *ReconcileIntrusionDetection) setDefaultsOnIntrusionDetection(ctx contex
 	}
 
 	return nil
+}
+
+func (r *ReconcileIntrusionDetection) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
+	log.WithValues(string(reason), message).Error(err, string(reason))
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
 }

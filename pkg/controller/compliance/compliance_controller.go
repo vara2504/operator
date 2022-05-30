@@ -152,7 +152,7 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	// Watch for changes to TigeraStatus.
 	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ComplianceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		return fmt.Errorf("logcollector-controller failed to watch logcollector Tigerastatus: %w", err)
+		return fmt.Errorf("compliance-controller failed to watch compliance Tigerastatus: %w", err)
 	}
 
 	return nil
@@ -208,7 +208,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	r.status.OnCRFound()
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
-	// Changes for updating logcollector status conditions
+	// Changes for updating compliance status conditions
 	if request.Name == ComplianceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
 		err := r.client.Get(ctx, types.NamespacedName{Name: ComplianceName}, ts)
