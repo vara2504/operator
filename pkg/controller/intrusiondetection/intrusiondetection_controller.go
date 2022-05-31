@@ -243,7 +243,7 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 		}
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		if err := r.client.Status().Update(ctx, instance); err != nil {
-			log.WithValues("reason", err).Info("Failed to create compliance status conditions.")
+			log.WithValues("reason", err).Info("Failed to create intrusion detection status conditions.")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
