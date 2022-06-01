@@ -233,7 +233,6 @@ var _ = Describe("Application layer controller tests", func() {
 
 				Expect(instance.Status.Conditions).To(HaveLen(0))
 			})
-
 			It("should reconcile with creating new status condition  with multiple conditions as true", func() {
 				ts := &operatorv1.TigeraStatus{
 					ObjectMeta: metav1.ObjectMeta{Name: "applicationlayer"},
