@@ -174,13 +174,13 @@ var _ = Describe("authentication controller tests", func() {
 						{
 							Type:    operatorv1.ComponentProgressing,
 							Status:  operatorv1.ConditionTrue,
-							Reason:  operatorv1.ResourceNotReady,
+							Reason:  string(operatorv1.ResourceNotReady),
 							Message: "Progressing Installation.operatorv1.tigera.io",
 						},
 						{
 							Type:    operatorv1.ComponentDegraded,
 							Status:  operatorv1.ConditionTrue,
-							Reason:  operatorv1.ResourceUpdateError,
+							Reason:  string(operatorv1.ResourceUpdateError),
 							Message: "Error resolving ImageSet for components",
 						},
 					},

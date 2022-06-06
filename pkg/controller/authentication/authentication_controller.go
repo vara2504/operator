@@ -167,7 +167,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		}
 		authentication.Status.Conditions = status.UpdateStatusCondition(authentication.Status.Conditions, ts.Status.Conditions, authentication.GetGeneration())
 		if err := r.client.Status().Update(ctx, authentication); err != nil {
-			log.WithValues("reason", err).Info("Failed to create applicationlayer status conditions.")
+			log.WithValues("reason", err).Info("Failed to create authentication status conditions.")
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
