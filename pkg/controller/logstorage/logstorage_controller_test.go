@@ -261,7 +261,7 @@ var _ = Describe("LogStorage controller", func() {
 					It("returns an error if the LogStorage resource exists and is not marked for deletion", func() {
 						r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
 						Expect(err).ShouldNot(HaveOccurred())
-						mockStatus.On("SetDegraded", "LogStorage validation failed", "cluster type is managed but LogStorage CR still exists").Return()
+						mockStatus.On("SetDegraded", string(operatorv1.ResourceValidationError), "LogStorage validation failed - cluster type is managed but LogStorage CR still exists").Return()
 						result, err := r.Reconcile(ctx, reconcile.Request{})
 						Expect(result).Should(Equal(reconcile.Result{}))
 						Expect(err).ShouldNot(HaveOccurred())
@@ -1041,6 +1041,270 @@ var _ = Describe("LogStorage controller", func() {
 
 					Expect(cli.Get(ctx, client.ObjectKey{Name: relasticsearch.InternalCertSecret, Namespace: render.ElasticsearchNamespace}, secret)).ShouldNot(HaveOccurred())
 					Expect(secret.GetOwnerReferences()).To(HaveLen(1))
+				})
+
+				//Status Condition test
+				It("should reconcile with one item in tigerastatus conditions", func() {
+
+					ts := &operatorv1.TigeraStatus{
+						ObjectMeta: metav1.ObjectMeta{Name: "log-storage"},
+						Spec:       operatorv1.TigeraStatusSpec{},
+						Status: operatorv1.TigeraStatusStatus{
+							Conditions: []operatorv1.TigeraStatusCondition{
+								{
+									Type:    operatorv1.ComponentAvailable,
+									Status:  operatorv1.ConditionTrue,
+									Reason:  string(operatorv1.AllObjectsAvailable),
+									Message: "All Objects are available",
+								},
+							},
+						},
+					}
+					Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
+					Expect(cli.Create(ctx, &operatorv1.LogStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "tigera-secure",
+							Generation: 3,
+						},
+						Spec: operatorv1.LogStorageSpec{
+							Nodes: &operatorv1.Nodes{
+								Count: int64(1),
+							},
+							StorageClassName: storageClassName,
+						},
+					})).ShouldNot(HaveOccurred())
+
+					Expect(cli.Create(ctx, &corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: render.ECKOperatorNamespace, Name: render.ECKLicenseConfigMapName},
+						Data:       map[string]string{"eck_license_level": string(render.ElasticsearchLicenseTypeEnterprise)},
+					})).ShouldNot(HaveOccurred())
+
+					r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					result, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+						Name:      "log-storage",
+						Namespace: "",
+					}})
+					Expect(err).ShouldNot(HaveOccurred())
+					// Expect to be waiting for Elasticsearch and Kibana to be functional
+					Expect(result).Should(Equal(reconcile.Result{}))
+
+					By("asserting the finalizers have been set on the LogStorage CR")
+					instance := &operatorv1.LogStorage{}
+					Expect(cli.Get(ctx, types.NamespacedName{Name: "tigera-secure"}, instance)).ShouldNot(HaveOccurred())
+					Expect(instance.Status.Conditions).To(HaveLen(1))
+
+					Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
+					Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+					Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
+					Expect(instance.Status.Conditions[0].Message).To(Equal("All Objects are available"))
+					Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
+
+				})
+				It("should reconcile with empty tigerastatus conditions", func() {
+
+					ts := &operatorv1.TigeraStatus{
+						ObjectMeta: metav1.ObjectMeta{Name: "log-storage"},
+						Spec:       operatorv1.TigeraStatusSpec{},
+						Status:     operatorv1.TigeraStatusStatus{},
+					}
+					Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
+					Expect(cli.Create(ctx, &operatorv1.LogStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "tigera-secure",
+							Generation: 3,
+						},
+						Spec: operatorv1.LogStorageSpec{
+							Nodes: &operatorv1.Nodes{
+								Count: int64(1),
+							},
+							StorageClassName: storageClassName,
+						},
+					})).ShouldNot(HaveOccurred())
+
+					Expect(cli.Create(ctx, &corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: render.ECKOperatorNamespace, Name: render.ECKLicenseConfigMapName},
+						Data:       map[string]string{"eck_license_level": string(render.ElasticsearchLicenseTypeEnterprise)},
+					})).ShouldNot(HaveOccurred())
+
+					r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					result, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+						Name:      "log-storage",
+						Namespace: "",
+					}})
+					Expect(err).ShouldNot(HaveOccurred())
+					// Expect to be waiting for Elasticsearch and Kibana to be functional
+					Expect(result).Should(Equal(reconcile.Result{}))
+
+					By("asserting the finalizers have been set on the LogStorage CR")
+					instance := &operatorv1.LogStorage{}
+					Expect(cli.Get(ctx, types.NamespacedName{Name: "tigera-secure"}, instance)).ShouldNot(HaveOccurred())
+					Expect(instance.Status.Conditions).To(HaveLen(0))
+				})
+				It("should reconcile with creating new status condition  with multiple conditions as true", func() {
+
+					ts := &operatorv1.TigeraStatus{
+						ObjectMeta: metav1.ObjectMeta{Name: "log-storage"},
+						Spec:       operatorv1.TigeraStatusSpec{},
+						Status: operatorv1.TigeraStatusStatus{
+							Conditions: []operatorv1.TigeraStatusCondition{
+								{
+									Type:    operatorv1.ComponentAvailable,
+									Status:  operatorv1.ConditionTrue,
+									Reason:  string(operatorv1.AllObjectsAvailable),
+									Message: "All Objects are available",
+								},
+								{
+									Type:    operatorv1.ComponentProgressing,
+									Status:  operatorv1.ConditionTrue,
+									Reason:  string(operatorv1.ResourceNotReady),
+									Message: "Progressing Installation.operatorv1.tigera.io",
+								},
+								{
+									Type:    operatorv1.ComponentDegraded,
+									Status:  operatorv1.ConditionTrue,
+									Reason:  string(operatorv1.ResourceUpdateError),
+									Message: "Error resolving ImageSet for components",
+								},
+							},
+						},
+					}
+					Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
+					Expect(cli.Create(ctx, &operatorv1.LogStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "tigera-secure",
+							Generation: 3,
+						},
+						Spec: operatorv1.LogStorageSpec{
+							Nodes: &operatorv1.Nodes{
+								Count: int64(1),
+							},
+							StorageClassName: storageClassName,
+						},
+					})).ShouldNot(HaveOccurred())
+
+					Expect(cli.Create(ctx, &corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: render.ECKOperatorNamespace, Name: render.ECKLicenseConfigMapName},
+						Data:       map[string]string{"eck_license_level": string(render.ElasticsearchLicenseTypeEnterprise)},
+					})).ShouldNot(HaveOccurred())
+
+					r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					result, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+						Name:      "log-storage",
+						Namespace: "",
+					}})
+					Expect(err).ShouldNot(HaveOccurred())
+					// Expect to be waiting for Elasticsearch and Kibana to be functional
+					Expect(result).Should(Equal(reconcile.Result{}))
+
+					By("asserting the finalizers have been set on the LogStorage CR")
+					instance := &operatorv1.LogStorage{}
+					Expect(cli.Get(ctx, types.NamespacedName{Name: "tigera-secure"}, instance)).ShouldNot(HaveOccurred())
+					Expect(instance.Status.Conditions).To(HaveLen(3))
+
+					Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
+					Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+					Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
+					Expect(instance.Status.Conditions[0].Message).To(Equal("All Objects are available"))
+					Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
+
+					Expect(instance.Status.Conditions[1].Type).To(Equal("Progressing"))
+					Expect(string(instance.Status.Conditions[1].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+					Expect(instance.Status.Conditions[1].Reason).To(Equal(string(operatorv1.ResourceNotReady)))
+					Expect(instance.Status.Conditions[1].Message).To(Equal("Progressing Installation.operatorv1.tigera.io"))
+					Expect(instance.Status.Conditions[1].ObservedGeneration).To(Equal(int64(3)))
+
+					Expect(instance.Status.Conditions[2].Type).To(Equal("Degraded"))
+					Expect(string(instance.Status.Conditions[2].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+					Expect(instance.Status.Conditions[2].Reason).To(Equal(string(operatorv1.ResourceUpdateError)))
+					Expect(instance.Status.Conditions[2].Message).To(Equal("Error resolving ImageSet for components"))
+					Expect(instance.Status.Conditions[2].ObservedGeneration).To(Equal(int64(3)))
+				})
+				It("should reconcile with creating new status condition and toggle Available to true & others to false", func() {
+
+					ts := &operatorv1.TigeraStatus{
+						ObjectMeta: metav1.ObjectMeta{Name: "log-storage"},
+						Spec:       operatorv1.TigeraStatusSpec{},
+						Status: operatorv1.TigeraStatusStatus{
+							Conditions: []operatorv1.TigeraStatusCondition{
+								{
+									Type:    operatorv1.ComponentAvailable,
+									Status:  operatorv1.ConditionTrue,
+									Reason:  string(operatorv1.AllObjectsAvailable),
+									Message: "All Objects are available",
+								},
+								{
+									Type:    operatorv1.ComponentProgressing,
+									Status:  operatorv1.ConditionFalse,
+									Reason:  string(operatorv1.NotApplicable),
+									Message: "Not Applicable",
+								},
+								{
+									Type:    operatorv1.ComponentDegraded,
+									Status:  operatorv1.ConditionFalse,
+									Reason:  string(operatorv1.NotApplicable),
+									Message: "Not Applicable",
+								},
+							},
+						},
+					}
+					Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
+					Expect(cli.Create(ctx, &operatorv1.LogStorage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:       "tigera-secure",
+							Generation: 3,
+						},
+						Spec: operatorv1.LogStorageSpec{
+							Nodes: &operatorv1.Nodes{
+								Count: int64(1),
+							},
+							StorageClassName: storageClassName,
+						},
+					})).ShouldNot(HaveOccurred())
+
+					Expect(cli.Create(ctx, &corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Namespace: render.ECKOperatorNamespace, Name: render.ECKLicenseConfigMapName},
+						Data:       map[string]string{"eck_license_level": string(render.ElasticsearchLicenseTypeEnterprise)},
+					})).ShouldNot(HaveOccurred())
+
+					r, err := NewReconcilerWithShims(cli, scheme, mockStatus, operatorv1.ProviderNone, mockEsCliCreator, dns.DefaultClusterDomain)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					result, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+						Name:      "log-storage",
+						Namespace: "",
+					}})
+					Expect(err).ShouldNot(HaveOccurred())
+					// Expect to be waiting for Elasticsearch and Kibana to be functional
+					Expect(result).Should(Equal(reconcile.Result{}))
+
+					By("asserting the finalizers have been set on the LogStorage CR")
+					instance := &operatorv1.LogStorage{}
+					Expect(cli.Get(ctx, types.NamespacedName{Name: "tigera-secure"}, instance)).ShouldNot(HaveOccurred())
+					Expect(instance.Status.Conditions).To(HaveLen(3))
+
+					Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
+					Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
+					Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
+					Expect(instance.Status.Conditions[0].Message).To(Equal("All Objects are available"))
+					Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
+
+					Expect(instance.Status.Conditions[1].Type).To(Equal("Progressing"))
+					Expect(string(instance.Status.Conditions[1].Status)).To(Equal(string(operatorv1.ConditionFalse)))
+					Expect(instance.Status.Conditions[1].Reason).To(Equal(string(operatorv1.NotApplicable)))
+					Expect(instance.Status.Conditions[1].Message).To(Equal("Not Applicable"))
+					Expect(instance.Status.Conditions[1].ObservedGeneration).To(Equal(int64(3)))
+
+					Expect(instance.Status.Conditions[2].Type).To(Equal("Degraded"))
+					Expect(string(instance.Status.Conditions[2].Status)).To(Equal(string(operatorv1.ConditionFalse)))
+					Expect(instance.Status.Conditions[2].Reason).To(Equal(string(operatorv1.NotApplicable)))
+					Expect(instance.Status.Conditions[2].Message).To(Equal("Not Applicable"))
+					Expect(instance.Status.Conditions[2].ObservedGeneration).To(Equal(int64(3)))
 				})
 
 				Context("checking rendered images", func() {
