@@ -20,8 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -33,6 +31,7 @@ import (
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -46,8 +45,8 @@ import (
 )
 
 const (
-	controllerName        = "clusterconnection-controller"
-	ClusterConnectionName = "management-cluster-connection"
+	controllerName = "clusterconnection-controller"
+	ResourceName   = "management-cluster-connection"
 )
 
 var log = logf.Log.WithName(controllerName)
@@ -123,7 +122,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ClusterConnectionName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("clusterconnection-controller failed to watch management-cluster-connection Tigerastatus: %w", err)
 	}
@@ -173,10 +172,10 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 		return result, nil
 	}
 
-	// Changes for updating application layer status conditions
-	if request.Name == ClusterConnectionName && request.Namespace == "" {
+	// Changes for updating managementClusterConnection status conditions
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: ClusterConnectionName}, ts)
+		err := r.Client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}

@@ -21,10 +21,9 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -52,7 +51,7 @@ import (
 	"github.com/tigera/operator/pkg/url"
 )
 
-const LogCollectorName = "log-collector"
+const ResourceName = "log-collector"
 
 var log = logf.Log.WithName("controller_logcollector")
 
@@ -146,9 +145,9 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: LogCollectorName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		return fmt.Errorf("logcollector-controller failed to watch logcollector Tigerastatus: %w", err)
+		return fmt.Errorf("logcollector-controller failed to watch log-collector Tigerastatus: %w", err)
 	}
 
 	return nil
@@ -250,9 +249,9 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 	r.status.OnCRFound()
 
 	// Changes for updating logcollector status conditions
-	if request.Name == LogCollectorName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: LogCollectorName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -267,7 +266,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 	preDefaultPatchFrom := client.MergeFrom(instance.DeepCopy())
 
 	if !utils.IsAPIServerReady(r.client, reqLogger) {
-		r.SetDegraded(operatorv1.ResourceNotReady, "Waiting for Tigera API server to be ready", err, reqLogger)
+		r.status.SetDegraded(string(operatorv1.ResourceNotReady), "Waiting for Tigera API server to be ready")
 		return reconcile.Result{}, nil
 	}
 
@@ -288,7 +287,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 	modifiedFields := fillDefaults(instance)
 	// Update the LogCollector instance with any changes that have occurred.
 	if err = r.client.Patch(ctx, instance, preDefaultPatchFrom); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, fmt.Sprintf("Failed to set defaults for LogCollector fields: [%s]",
+		r.SetDegraded(operatorv1.ResourcePatchError, fmt.Sprintf("Failed to set defaults for LogCollector fields: [%s]",
 			strings.Join(modifiedFields, ", "),
 		), err, reqLogger)
 		return reconcile.Result{}, err
@@ -349,7 +348,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get certificate", err, reqLogger)
 		return reconcile.Result{}, err
 	} else if certificate == nil {
-		r.SetDegraded(operatorv1.ResourceNotReady, "Prometheus secrets are not available yet, waiting until they become available", err, reqLogger)
+		r.status.SetDegraded(string(operatorv1.ResourceNotReady), "Prometheus secrets are not available yet, waiting until they become available")
 		return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 	}
 	trustedBundle := certificateManager.CreateTrustedBundle(certificate)
@@ -371,7 +370,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 				return reconcile.Result{}, err
 			}
 			if s3Credential == nil {
-				r.SetDegraded(operatorv1.ResourceNotFound, "S3 credential secret does not exist", err, reqLogger)
+				r.status.SetDegraded(string(operatorv1.ResourceNotFound), "S3 credential secret does not exist")
 				return reconcile.Result{}, nil
 			}
 		}
@@ -386,7 +385,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 				return reconcile.Result{}, err
 			}
 			if splunkCredential == nil {
-				r.SetDegraded(operatorv1.ResourceNotFound, "Splunk credential secret does not exist", err, reqLogger)
+				r.status.SetDegraded(string(operatorv1.ResourceNotFound), "Splunk credential secret does not exist")
 				return reconcile.Result{}, nil
 			}
 		}
@@ -417,7 +416,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 					for _, l := range syslog.LogTypes {
 						// Set status to degraded to warn user and let them fix the issue themselves.
 						if l == v1.SyslogLogIDSEvents {
-							r.SetDegraded(operatorv1.ResourceValidationError, "IDSEvents option is not supported for Syslog config in a managed cluster", err, reqLogger)
+							r.status.SetDegraded(string(operatorv1.ResourceValidationError), "IDSEvents option is not supported for Syslog config in a managed cluster")
 							return reconcile.Result{}, err
 						}
 					}
@@ -443,9 +442,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 					instance.Spec.AdditionalSources.EksCloudwatchLog.GroupName,
 					instance.Spec.AdditionalSources.EksCloudwatchLog.StreamPrefix)
 				if err != nil {
-					log.Error(err, "Error retrieving EKS Cloudwatch Logs configuration")
-					r.status.SetDegraded("Error retrieving EKS Cloudwatch Logs configuration", err.Error())
-					r.SetDegraded(operatorv1.ResourceReadError, "Error retrieving Fluentd filters", err, reqLogger)
+					r.SetDegraded(operatorv1.ResourceReadError, "Error retrieving EKS Cloudwatch Logs configuration", err, reqLogger)
 					return reconcile.Result{}, err
 				}
 			}
@@ -485,7 +482,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -519,7 +516,7 @@ func (r *ReconcileLogCollector) Reconcile(ctx context.Context, request reconcile
 		comp = render.Fluentd(fluentdCfg)
 
 		if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-			r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
+			r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
@@ -705,5 +702,9 @@ func getEksCloudwatchLogConfig(client client.Client, interval int32, region, gro
 
 func (r *ReconcileLogCollector) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

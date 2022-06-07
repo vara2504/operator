@@ -19,11 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/go-ldap/ldap"
-
+	"github.com/go-logr/logr"
 	oprv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -35,6 +32,7 @@ import (
 	"github.com/tigera/operator/pkg/render"
 	rcertificatemanagement "github.com/tigera/operator/pkg/render/certificatemanagement"
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -56,7 +54,7 @@ const (
 
 	defaultNameAttribute string = "uid"
 
-	AuthenticationName = "authentication"
+	ResourceName = "authentication"
 )
 
 // Add creates a new authentication Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -119,9 +117,9 @@ func add(mgr manager.Manager, r *ReconcileAuthentication) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &oprv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: AuthenticationName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &oprv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		return fmt.Errorf("Authentication-controller failed to watch Authentication Tigerastatus: %w", err)
+		return fmt.Errorf("authentication-controller failed to watch authentication Tigerastatus: %w", err)
 	}
 
 	return nil
@@ -159,9 +157,9 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	r.status.OnCRFound()
 
 	// Changes for updating application layer status conditions
-	if request.Name == AuthenticationName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &oprv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: AuthenticationName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}

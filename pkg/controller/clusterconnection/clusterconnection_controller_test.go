@@ -18,15 +18,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tigera/operator/pkg/controller/utils"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/components"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
 	"github.com/tigera/operator/pkg/controller/status"
+	"github.com/tigera/operator/pkg/controller/utils"
 	"github.com/tigera/operator/pkg/dns"
 	"github.com/tigera/operator/test"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/tigera/operator/pkg/controller/clusterconnection"
 	"github.com/tigera/operator/pkg/render"
@@ -207,8 +206,8 @@ var _ = Describe("ManagementClusterConnection controller tests", func() {
 				Spec:       operatorv1.TigeraStatusSpec{},
 				Status:     operatorv1.TigeraStatusStatus{},
 			}
-
 			Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
+
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      "management-cluster-connection",
 				Namespace: "",
@@ -216,7 +215,6 @@ var _ = Describe("ManagementClusterConnection controller tests", func() {
 
 			instance, err := utils.GetManagementClusterConnection(ctx, c)
 			Expect(err).ShouldNot(HaveOccurred())
-			//length := len(inst.Status.Conditions)
 			Expect(instance.Status.Conditions).To(HaveLen(0))
 			Expect(c.Delete(ctx, ts)).NotTo(HaveOccurred())
 		})
@@ -253,7 +251,6 @@ var _ = Describe("ManagementClusterConnection controller tests", func() {
 			Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
 			Expect(c.Delete(ctx, ts)).NotTo(HaveOccurred())
 		})
-
 		It("should reconcile with creating new status condition  with multiple conditions as true", func() {
 			ts := &operatorv1.TigeraStatus{
 				ObjectMeta: metav1.ObjectMeta{Name: "management-cluster-connection"},
@@ -291,7 +288,6 @@ var _ = Describe("ManagementClusterConnection controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -348,7 +344,6 @@ var _ = Describe("ManagementClusterConnection controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

@@ -485,7 +485,6 @@ var _ = Describe("Manager controller tests", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(1))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -498,7 +497,6 @@ var _ = Describe("Manager controller tests", func() {
 					Spec:       operatorv1.TigeraStatusSpec{},
 					Status:     operatorv1.TigeraStatusStatus{},
 				}
-
 				Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
 
 				_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
@@ -548,7 +546,6 @@ var _ = Describe("Manager controller tests", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(3))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

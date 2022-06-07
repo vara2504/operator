@@ -530,7 +530,6 @@ var _ = Describe("LogCollector controller tests", func() {
 		})
 		Context("reconcile for Status condition update from tigerastatus", func() {
 			It("should reconcile with one item ", func() {
-
 				ts := &operatorv1.TigeraStatus{
 					ObjectMeta: metav1.ObjectMeta{Name: "log-collector"},
 					Spec:       operatorv1.TigeraStatusSpec{},
@@ -552,7 +551,6 @@ var _ = Describe("LogCollector controller tests", func() {
 					Namespace: "",
 				}})
 				Expect(err).ShouldNot(HaveOccurred())
-
 				instance, err := GetLogCollector(ctx, r.client)
 				Expect(err).ShouldNot(HaveOccurred())
 
@@ -576,7 +574,6 @@ var _ = Describe("LogCollector controller tests", func() {
 					Namespace: "",
 				}})
 				Expect(err).ShouldNot(HaveOccurred())
-
 				instance, err := GetLogCollector(ctx, r.client)
 				Expect(err).ShouldNot(HaveOccurred())
 
@@ -616,12 +613,10 @@ var _ = Describe("LogCollector controller tests", func() {
 					Namespace: "",
 				}})
 				Expect(err).ShouldNot(HaveOccurred())
-
 				instance, err := GetLogCollector(ctx, r.client)
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(3))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -674,12 +669,10 @@ var _ = Describe("LogCollector controller tests", func() {
 					Namespace: "",
 				}})
 				Expect(err).ShouldNot(HaveOccurred())
-
 				instance, err := GetLogCollector(ctx, r.client)
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(3))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

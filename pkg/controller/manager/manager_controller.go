@@ -20,8 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -37,6 +35,7 @@ import (
 	relasticsearch "github.com/tigera/operator/pkg/render/common/elasticsearch"
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,7 +50,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const ManagerName = "manager"
+const ResourceName = "manager"
 
 var log = logf.Log.WithName("controller_manager")
 
@@ -177,7 +176,7 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ManagerName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("manager-controller failed to watch manager Tigerastatus: %w", err)
 	}
@@ -236,10 +235,10 @@ func (r *ReconcileManager) Reconcile(ctx context.Context, request reconcile.Requ
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 	r.status.OnCRFound()
 
-	// Changes for updating compliance status conditions
-	if request.Name == ManagerName && request.Namespace == "" {
+	// Changes for updating manager status conditions
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: ManagerName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -324,7 +323,7 @@ func (r *ReconcileManager) Reconcile(ctx context.Context, request reconcile.Requ
 	// Fetch the Authentication spec. If present, we use to configure user authentication.
 	authenticationCR, err := utils.GetAuthentication(ctx, r.client)
 	if err != nil && !errors.IsNotFound(err) {
-		r.SetDegraded(operatorv1.ResourceNotFound, "Error while fetching Authentication", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceReadError, "Error while fetching Authentication", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	if authenticationCR != nil && authenticationCR.Status.State != operatorv1.TigeraStatusReady {
@@ -490,7 +489,7 @@ func (r *ReconcileManager) Reconcile(ctx context.Context, request reconcile.Requ
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, component); err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -527,5 +526,9 @@ func (r *ReconcileManager) Reconcile(ctx context.Context, request reconcile.Requ
 }
 func (r *ReconcileManager) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

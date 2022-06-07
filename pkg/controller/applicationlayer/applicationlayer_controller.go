@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-
 	operatorv1 "github.com/tigera/operator/api/v1"
 	crdv1 "github.com/tigera/operator/pkg/apis/crd.projectcalico.org/v1"
 	"github.com/tigera/operator/pkg/common"
@@ -48,7 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const ApplicationLayerName = "applicationlayer"
+const ResourceName = "applicationlayer"
 
 var log = logf.Log.WithName("controller_applicationlayer")
 
@@ -139,7 +138,7 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ApplicationLayerName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("ApplicationLayer-controller failed to watch applicationlayer Tigerastatus: %w", err)
 	}
@@ -188,9 +187,9 @@ func (r *ReconcileApplicationLayer) Reconcile(ctx context.Context, request recon
 	r.status.OnCRFound()
 
 	// Changes for updating application layer status conditions
-	if request.Name == ApplicationLayerName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: ApplicationLayerName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -481,5 +480,9 @@ func (r *ReconcileApplicationLayer) patchFelixTproxyMode(ctx context.Context, al
 }
 func (r *ReconcileApplicationLayer) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

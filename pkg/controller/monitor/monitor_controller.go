@@ -53,7 +53,7 @@ import (
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
 )
 
-const MonitorName = "monitor"
+const ResourceName = "monitor"
 
 var log = logf.Log.WithName("controller_monitor")
 
@@ -137,9 +137,9 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: MonitorName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
-		return fmt.Errorf("monitor-controller failed to watch logstorage Tigerastatus: %w", err)
+		return fmt.Errorf("monitor-controller failed to watch monitor Tigerastatus: %w", err)
 	}
 
 	return nil
@@ -169,7 +169,11 @@ func (r *ReconcileMonitor) getMonitor(ctx context.Context) (*operatorv1.Monitor,
 
 func (r *ReconcileMonitor) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }
 
 func (r *ReconcileMonitor) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -189,13 +193,12 @@ func (r *ReconcileMonitor) Reconcile(ctx context.Context, request reconcile.Requ
 	r.status.OnCRFound()
 
 	// Changes for updating logstorage status conditions
-	if request.Name == MonitorName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: MonitorName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		//status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		if err := r.client.Status().Update(ctx, instance); err != nil {
 			log.WithValues("reason", err).Info("Failed to create monitor status conditions.")
@@ -270,7 +273,7 @@ func (r *ReconcileMonitor) Reconcile(ctx context.Context, request reconcile.Requ
 	// Fetch the Authentication spec. If present, we use to configure user authentication.
 	authenticationCR, err := utils.GetAuthentication(ctx, r.client)
 	if err != nil && !errors.IsNotFound(err) {
-		r.SetDegraded(operatorv1.ResourceNotFound, "Error querying Authentication", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceReadError, "Error querying Authentication", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	if authenticationCR != nil && authenticationCR.Status.State != operatorv1.TigeraStatusReady {

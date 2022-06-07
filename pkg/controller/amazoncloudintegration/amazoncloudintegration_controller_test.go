@@ -175,6 +175,28 @@ var _ = Describe("amazoncloudintegration controller tests", func() {
 		})
 	})
 	Context("Reconcile for Condition status", func() {
+		It("should reconcile with empty tigerastatus conditions ", func() {
+			ts := &operatorv1.TigeraStatus{
+				ObjectMeta: metav1.ObjectMeta{Name: "amazon-cloud-integration"},
+				Spec:       operatorv1.TigeraStatusSpec{},
+				Status:     operatorv1.TigeraStatusStatus{},
+			}
+			Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
+
+			r := ReconcileAmazonCloudIntegration{
+				client:   cli,
+				scheme:   scheme,
+				provider: operatorv1.ProviderNone,
+				status:   mockStatus,
+			}
+			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
+				Name:      "amazon-cloud-integration",
+				Namespace: "",
+			}})
+			instance, err := utils.GetAmazonCloudIntegration(ctx, cli)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(instance.Status.Conditions).To(HaveLen(0))
+		})
 		It("should reconcile with creating new status condition with one item", func() {
 			ts := &operatorv1.TigeraStatus{
 				ObjectMeta: metav1.ObjectMeta{Name: "amazon-cloud-integration"},
@@ -206,36 +228,11 @@ var _ = Describe("amazoncloudintegration controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(1))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
 			Expect(instance.Status.Conditions[0].Message).To(Equal("All Objects are available"))
 			Expect(instance.Status.Conditions[0].ObservedGeneration).To(Equal(int64(3)))
-		})
-		It("should reconcile with empty tigerastatus conditions ", func() {
-			ts := &operatorv1.TigeraStatus{
-				ObjectMeta: metav1.ObjectMeta{Name: "amazon-cloud-integration"},
-				Spec:       operatorv1.TigeraStatusSpec{},
-				Status:     operatorv1.TigeraStatusStatus{},
-			}
-
-			Expect(cli.Create(ctx, ts)).NotTo(HaveOccurred())
-
-			r := ReconcileAmazonCloudIntegration{
-				client:   cli,
-				scheme:   scheme,
-				provider: operatorv1.ProviderNone,
-				status:   mockStatus,
-			}
-			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
-				Name:      "amazon-cloud-integration",
-				Namespace: "",
-			}})
-			instance, err := utils.GetAmazonCloudIntegration(ctx, cli)
-			Expect(err).ShouldNot(HaveOccurred())
-
-			Expect(instance.Status.Conditions).To(HaveLen(0))
 		})
 		It("should reconcile with creating new status condition  with multiple conditions as true", func() {
 			ts := &operatorv1.TigeraStatus{
@@ -280,7 +277,6 @@ var _ = Describe("amazoncloudintegration controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -342,7 +338,6 @@ var _ = Describe("amazoncloudintegration controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

@@ -20,9 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -36,7 +33,9 @@ import (
 	relasticsearch "github.com/tigera/operator/pkg/render/common/elasticsearch"
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -47,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const ComplianceName = "compliance"
+const ResourceName = "compliance"
 
 var log = logf.Log.WithName("controller_compliance")
 
@@ -150,7 +149,7 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ComplianceName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("compliance-controller failed to watch compliance Tigerastatus: %w", err)
 	}
@@ -209,9 +208,9 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
 	// Changes for updating compliance status conditions
-	if request.Name == ComplianceName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: ComplianceName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -263,8 +262,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	esClusterConfig, err := utils.GetElasticsearchClusterConfig(ctx, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Elasticsearch cluster configuration is not available, waiting for it to become available")
-			r.status.SetDegraded(string(operatorv1.ResourceNotReady), fmt.Sprintf("Elasticsearch cluster configuration is not available, waiting for it to become available- %s", err.Error()))
+			r.SetDegraded(operatorv1.ResourceNotReady, "Elasticsearch cluster configuration is not available, waiting for it to become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
 		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get the elasticsearch cluster configuration", err, reqLogger)
@@ -290,7 +288,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 
 	if managementClusterConnection != nil && managementCluster != nil {
 		err = fmt.Errorf("having both a ManagementCluster and a ManagementClusterConnection is not supported")
-		r.SetDegraded(operatorv1.ResourceValidationError, "", err, log)
+		r.SetDegraded(operatorv1.ResourceValidationError, "", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -302,8 +300,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	esSecrets, err := utils.ElasticsearchSecrets(ctx, secretsToWatch, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Elasticsearch secrets are not available yet, waiting until they become available")
-			r.status.SetDegraded(string(operatorv1.ResourceNotReady), fmt.Sprintf("Elasticsearch secrets are not available yet, waiting until they become available - %s", err.Error()))
+			r.SetDegraded(operatorv1.ResourceNotReady, "Elasticsearch secrets are not available yet, waiting until they become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
 		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch credentials", err, reqLogger)
@@ -342,7 +339,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	// Fetch the Authentication spec. If present, we use to configure user authentication.
 	authenticationCR, err := utils.GetAuthentication(ctx, r.client)
 	if err != nil && !errors.IsNotFound(err) {
-		r.SetDegraded(operatorv1.ResourceNotFound, "Error querying Authentication", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceReadError, "Error querying Authentication", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	if authenticationCR != nil && authenticationCR.Status.State != operatorv1.TigeraStatusReady {
@@ -384,7 +381,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	certificateComponent := rcertificatemanagement.CertificateManagement(&rcertificatemanagement.Config{
@@ -428,5 +425,9 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 
 func (r *ReconcileCompliance) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

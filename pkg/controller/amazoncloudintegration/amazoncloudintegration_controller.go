@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,7 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const AmazonCloudIntegrationName = "amazon-cloud-integration"
+const ResourceName = "amazon-cloud-integration"
 
 var log = logf.Log.WithName("controller_amazoncloudintegration")
 
@@ -100,7 +99,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: AmazonCloudIntegrationName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("amazoncloudintegration-controller failed to watch amazon-cloud-integration Tigerastatus: %w", err)
 	}
@@ -149,9 +148,9 @@ func (r *ReconcileAmazonCloudIntegration) Reconcile(ctx context.Context, request
 	r.status.OnCRFound()
 
 	// Changes for updating application layer status conditions
-	if request.Name == AmazonCloudIntegrationName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: AmazonCloudIntegrationName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -190,7 +189,7 @@ func (r *ReconcileAmazonCloudIntegration) Reconcile(ctx context.Context, request
 		return reconcile.Result{}, err
 	}
 	if variant != operatorv1.TigeraSecureEnterprise {
-		r.SetDegraded(operatorv1.ResourceNotReady, fmt.Sprintf("Waiting for network to be %s", operatorv1.TigeraSecureEnterprise), fmt.Errorf(""), reqLogger)
+		r.SetDegraded(operatorv1.ResourceNotReady, "", fmt.Errorf("Waiting for network to be %s", operatorv1.TigeraSecureEnterprise), reqLogger)
 		return reconcile.Result{}, nil
 	}
 
@@ -254,7 +253,11 @@ func (r *ReconcileAmazonCloudIntegration) Reconcile(ctx context.Context, request
 
 func (r *ReconcileAmazonCloudIntegration) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }
 
 func getAmazonCredential(client client.Client) (*render.AmazonCredential, error) {

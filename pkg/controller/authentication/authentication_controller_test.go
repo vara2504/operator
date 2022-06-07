@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -40,6 +38,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -124,13 +123,10 @@ var _ = Describe("authentication controller tests", func() {
 				Name:      "authentication",
 				Namespace: "",
 			}})
-
-			//instance, err := getApplicationLayer(ctx, r.client)
 			instance, err := utils.GetAuthentication(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(1))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -152,11 +148,8 @@ var _ = Describe("authentication controller tests", func() {
 				Name:      "authentication",
 				Namespace: "",
 			}})
-
-			//instance, err := getApplicationLayer(ctx, r.client)
 			instance, err := utils.GetAuthentication(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
-
 			Expect(instance.Status.Conditions).To(HaveLen(0))
 		})
 		It("should reconcile with creating new status condition  with multiple conditions as true", func() {
@@ -194,8 +187,6 @@ var _ = Describe("authentication controller tests", func() {
 				Name:      "authentication",
 				Namespace: "",
 			}})
-
-			//instance, err := getApplicationLayer(ctx, r.client)
 			instance, err := utils.GetAuthentication(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
 
@@ -254,8 +245,6 @@ var _ = Describe("authentication controller tests", func() {
 				Name:      "authentication",
 				Namespace: "",
 			}})
-
-			//instance, err := getApplicationLayer(ctx, r.client)
 			instance, err := utils.GetAuthentication(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
 

@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	relasticsearch "github.com/tigera/operator/pkg/render/common/elasticsearch"
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
 	"github.com/tigera/operator/pkg/render/common/secret"
@@ -46,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -616,12 +615,10 @@ var _ = Describe("Compliance controller tests", func() {
 				Name:      "compliance",
 				Namespace: "",
 			}})
-
 			instance, err := GetCompliance(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(1))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -634,18 +631,16 @@ var _ = Describe("Compliance controller tests", func() {
 				Spec:       operatorv1.TigeraStatusSpec{},
 				Status:     operatorv1.TigeraStatusStatus{},
 			}
-
 			Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
+
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      "compliance",
 				Namespace: "",
 			}})
 			instance, err := GetCompliance(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
-
 			Expect(instance.Status.Conditions).To(HaveLen(0))
 		})
-
 		It("should reconcile with creating new status condition  with multiple conditions as true", func() {
 			ts := &operatorv1.TigeraStatus{
 				ObjectMeta: metav1.ObjectMeta{Name: "compliance"},
@@ -674,6 +669,7 @@ var _ = Describe("Compliance controller tests", func() {
 				},
 			}
 			Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
+
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      "compliance",
 				Namespace: "",
@@ -682,7 +678,6 @@ var _ = Describe("Compliance controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -734,12 +729,10 @@ var _ = Describe("Compliance controller tests", func() {
 				Name:      "compliance",
 				Namespace: "",
 			}})
-
 			instance, err := GetCompliance(ctx, r.client)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

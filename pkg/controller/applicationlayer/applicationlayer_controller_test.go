@@ -18,8 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/mock"
@@ -39,6 +37,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -208,7 +207,6 @@ var _ = Describe("Application layer controller tests", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(1))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -221,7 +219,6 @@ var _ = Describe("Application layer controller tests", func() {
 					Spec:       operatorv1.TigeraStatusSpec{},
 					Status:     operatorv1.TigeraStatusStatus{},
 				}
-
 				Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
 
 				_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
@@ -230,7 +227,6 @@ var _ = Describe("Application layer controller tests", func() {
 				}})
 				instance, err := getApplicationLayer(ctx, r.client)
 				Expect(err).ShouldNot(HaveOccurred())
-
 				Expect(instance.Status.Conditions).To(HaveLen(0))
 			})
 			It("should reconcile with creating new status condition  with multiple conditions as true", func() {
@@ -270,7 +266,6 @@ var _ = Describe("Application layer controller tests", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(3))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -326,7 +321,6 @@ var _ = Describe("Application layer controller tests", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 
 				Expect(instance.Status.Conditions).To(HaveLen(3))
-
 				Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 				Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 				Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

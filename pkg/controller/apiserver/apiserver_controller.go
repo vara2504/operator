@@ -20,9 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -37,7 +34,9 @@ import (
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -47,7 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const APIServerName string = "apiserver"
+const ResourceName string = "apiserver"
 
 var log = logf.Log.WithName("controller_apiserver")
 
@@ -142,7 +141,7 @@ func add(mgr manager.Manager, r *ReconcileAPIServer) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: APIServerName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("apiserver-controller failed to watch apiserver Tigerastatus: %w", err)
 	}
@@ -190,13 +189,12 @@ func (r *ReconcileAPIServer) Reconcile(ctx context.Context, request reconcile.Re
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
 	// Changes for updating apiserver status conditions
-	if request.Name == APIServerName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: APIServerName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-		//status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions, instance.GetGeneration())
 		if err := r.client.Status().Update(ctx, instance); err != nil {
 			log.WithValues("reason", err).Info("Failed to create apiserver status conditions.")
@@ -264,7 +262,7 @@ func (r *ReconcileAPIServer) Reconcile(ctx context.Context, request reconcile.Re
 
 		if managementClusterConnection != nil && managementCluster != nil {
 			err = fmt.Errorf("having both a ManagementCluster and a ManagementClusterConnection is not supported")
-			r.SetDegraded(operatorv1.ResourceValidationError, "having both a ManagementCluster and a ManagementClusterConnection is not supported", err, reqLogger)
+			r.SetDegraded(operatorv1.ResourceValidationError, "", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
@@ -412,5 +410,9 @@ func (r *ReconcileAPIServer) Reconcile(ctx context.Context, request reconcile.Re
 }
 func (r *ReconcileAPIServer) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

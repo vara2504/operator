@@ -19,11 +19,10 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
 	rtest "github.com/tigera/operator/pkg/render/common/test"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/tigera/operator/pkg/render/intrusiondetection/dpi"
 
@@ -591,7 +590,6 @@ var _ = Describe("IntrusionDetection controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(1))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -604,7 +602,6 @@ var _ = Describe("IntrusionDetection controller tests", func() {
 				Spec:       operatorv1.TigeraStatusSpec{},
 				Status:     operatorv1.TigeraStatusStatus{},
 			}
-
 			Expect(c.Create(ctx, ts)).NotTo(HaveOccurred())
 
 			_, err := r.Reconcile(ctx, reconcile.Request{NamespacedName: types.NamespacedName{
@@ -617,7 +614,6 @@ var _ = Describe("IntrusionDetection controller tests", func() {
 
 			Expect(instance.Status.Conditions).To(HaveLen(0))
 		})
-
 		It("should reconcile with creating new status condition  with multiple conditions as true", func() {
 			ts := &operatorv1.TigeraStatus{
 				ObjectMeta: metav1.ObjectMeta{Name: "intrusion-detection"},
@@ -656,7 +652,6 @@ var _ = Describe("IntrusionDetection controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))
@@ -713,7 +708,6 @@ var _ = Describe("IntrusionDetection controller tests", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 
 			Expect(instance.Status.Conditions).To(HaveLen(3))
-
 			Expect(instance.Status.Conditions[0].Type).To(Equal("Ready"))
 			Expect(string(instance.Status.Conditions[0].Status)).To(Equal(string(operatorv1.ConditionTrue)))
 			Expect(instance.Status.Conditions[0].Reason).To(Equal(string(operatorv1.AllObjectsAvailable)))

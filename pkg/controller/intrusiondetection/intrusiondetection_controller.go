@@ -20,8 +20,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/types"
-
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
@@ -38,6 +36,7 @@ import (
 	relasticsearch "github.com/tigera/operator/pkg/render/common/elasticsearch"
 	"github.com/tigera/operator/pkg/render/intrusiondetection/dpi"
 	"github.com/tigera/operator/pkg/tls/certificatemanagement"
+	"k8s.io/apimachinery/pkg/types"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -55,7 +54,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-const IntrusionDetectionName = "intrusion-detection"
+const ResourceName = "intrusion-detection"
 
 var log = logf.Log.WithName("controller_intrusiondetection")
 
@@ -187,7 +186,7 @@ func add(mgr manager.Manager, c controller.Controller) error {
 	}
 
 	// Watch for changes to TigeraStatus.
-	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: IntrusionDetectionName}}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &operatorv1.TigeraStatus{ObjectMeta: metav1.ObjectMeta{Name: ResourceName}}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return fmt.Errorf("intrusiondetection-controller failed to watch intrusion-detection Tigerastatus: %w", err)
 	}
@@ -240,9 +239,9 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
 	// Changes for updating compliance status conditions
-	if request.Name == IntrusionDetectionName && request.Namespace == "" {
+	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
-		err := r.client.Get(ctx, types.NamespacedName{Name: IntrusionDetectionName}, ts)
+		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -413,7 +412,7 @@ func (r *ReconcileIntrusionDetection) Reconcile(ctx context.Context, request rec
 	comp := render.IntrusionDetection(intrusionDetectionCfg)
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Error with images from ImageSet", err, reqLogger)
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -527,5 +526,9 @@ func (r *ReconcileIntrusionDetection) setDefaultsOnIntrusionDetection(ctx contex
 
 func (r *ReconcileIntrusionDetection) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
 	log.WithValues(string(reason), message).Error(err, string(reason))
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, err))
+	errormsg := ""
+	if err != nil {
+		errormsg = err.Error()
+	}
+	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }
