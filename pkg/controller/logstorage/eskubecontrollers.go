@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021 Tigera, Inc. All rights reserved.
+// Copyright (c) 2020-2022 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,22 +44,19 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 ) (reconcile.Result, bool, error) {
 	kubeControllerEsPublicCertSecret, err := utils.GetSecret(ctx, r.client, relasticsearch.PublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		log.Error(err, err.Error())
-		r.status.SetDegraded("Failed to get Elasticsearch pub cert secret used by kube controllers", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch pub cert secret used by kube controllers", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	kubeControllersUserSecret, err := utils.GetSecret(ctx, r.client, kubecontrollers.ElasticsearchKubeControllersUserSecret, common.OperatorNamespace())
 	if err != nil {
-		log.Error(err, err.Error())
-		r.status.SetDegraded("Failed to get kube controllers gateway secret", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get kube controllers gateway secret", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	kubeControllerKibanaPublicCertSecret, err := utils.GetSecret(ctx, r.client, render.KibanaPublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		log.Error(err, err.Error())
-		r.status.SetDegraded("Failed to get Kibana pub cert secret used by kube controllers", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Kibana pub cert secret used by kube controllers", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
@@ -71,8 +68,7 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 
 	certificateManager, err := certificatemanager.Create(r.client, install, r.clusterDomain)
 	if err != nil {
-		log.Error(err, "unable to create the Tigera CA")
-		r.status.SetDegraded("Unable to create the Tigera CA", err.Error())
+		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
@@ -81,7 +77,7 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 		svcDNSNames := append(dns.GetServiceDNSNames(render.ManagerServiceName, render.ManagerNamespace, r.clusterDomain), render.ManagerServiceIP)
 		managerInternalTLSSecret, err = certificateManager.GetOrCreateKeyPair(r.client, render.ManagerInternalTLSSecretName, common.CalicoNamespace, svcDNSNames)
 		if err != nil {
-			r.status.SetDegraded(fmt.Sprintf("Error ensuring internal manager TLS certificate %q exists and has valid DNS names", render.ManagerInternalTLSSecretName), err.Error())
+			r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("Error ensuring internal manager TLS certificate %q exists and has valid DNS names", render.ManagerInternalTLSSecretName), err, reqLogger)
 			return reconcile.Result{}, false, err
 		}
 	}
@@ -102,26 +98,22 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 
 	imageSet, err := imageset.GetImageSet(ctx, r.client, install.Variant)
 	if err != nil {
-		reqLogger.Error(err, "Error getting ImageSet")
-		r.status.SetDegraded("Error getting ImageSet", err.Error())
+		r.SetDegraded(operatorv1.ResourceReadError, "Error getting ImageSet", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err = imageset.ValidateImageSet(imageSet); err != nil {
-		reqLogger.Error(err, "Error validating ImageSet")
-		r.status.SetDegraded("Error validating ImageSet", err.Error())
+		r.SetDegraded(operatorv1.ResourceValidationError, "Error validating ImageSet", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err = imageset.ResolveImages(imageSet, esKubeControllerComponents); err != nil {
-		reqLogger.Error(err, "Error resolving ImageSet for elasticsearch kube-controllers components")
-		r.status.SetDegraded("Error resolving ImageSet for elasticsearch kube-controllers components", err.Error())
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error resolving ImageSet for elasticsearch kube-controllers components", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err := hdler.CreateOrUpdateOrDelete(ctx, esKubeControllerComponents, nil); err != nil {
-		reqLogger.Error(err, "Error creating / updating  elasticsearch kube-controllers resource")
-		r.status.SetDegraded("Error creating / updating  elasticsearch kube-controllers resource", err.Error())
+		r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating  elasticsearch kube-controllers resource", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
