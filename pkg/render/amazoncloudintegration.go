@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Tigera, Inc. All rights reserved.
+// Copyright (c) 2019-2022 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,8 +41,8 @@ const (
 	credentialSecretHashAnnotation       = "hash.operator.tigera.io/credential-secret"
 )
 
-func AmazonCloudIntegration(cfg *AmazonCloudIntegrationConfiguration) (Component, error) {
-	return &amazonCloudIntegrationComponent{cfg: cfg}, nil
+func AmazonCloudIntegration(cfg *AmazonCloudIntegrationConfiguration) Component {
+	return &amazonCloudIntegrationComponent{cfg: cfg}
 }
 
 // AmazonCloudIntegrationConfiguration contains all the config information needed to render the component.
