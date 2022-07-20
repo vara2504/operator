@@ -31,7 +31,7 @@ type APIServerStatus struct {
 	State string `json:"state,omitempty"`
 
 	// Conditions represents the latest observed set of conditions for the component. A component may be one or more of
-	// Ready, Progressing, Degraded or other customer types
+	// Ready, Progressing, Degraded or other customer types.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

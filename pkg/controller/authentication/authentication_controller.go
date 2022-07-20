@@ -26,7 +26,6 @@ import (
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
 
 	"github.com/go-ldap/ldap"
-	"github.com/go-logr/logr"
 	oprv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -203,13 +202,13 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 
 	// Validate the configuration
 	if err := validateAuthentication(authentication); err != nil {
-		r.SetDegraded(oprv1.ResourceValidationError, "Invalid Authentication provided", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceValidationError, "Invalid Authentication provided", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	// Write the authentication back to the datastore, so the controllers depending on this can reconcile.
 	if err = r.client.Patch(ctx, authentication, preDefaultPatchFrom); err != nil {
-		r.SetDegraded(oprv1.ResourcePatchError, "Failed to write defaults", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourcePatchError, "Failed to write defaults", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -217,10 +216,10 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	variant, install, err := utils.GetInstallation(context.Background(), r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(oprv1.ResourceNotFound, "Installation not found", err, reqLogger)
+			status.SetDegraded(r.status, oprv1.ResourceNotFound, "Installation not found", err, reqLogger)
 			return reconcile.Result{}, err
 		}
-		r.SetDegraded(oprv1.ResourceReadError, "Error querying installation", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceReadError, "Error querying installation", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	if variant != oprv1.TigeraSecureEnterprise {
@@ -243,10 +242,10 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	// Make sure the tigera-dex namespace exists, before rendering any objects there.
 	if err := r.client.Get(ctx, client.ObjectKey{Name: render.DexObjectName}, &corev1.Namespace{}); err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(oprv1.ResourceNotFound, "Waiting for namespace tigera-dex to be created", err, reqLogger)
+			status.SetDegraded(r.status, oprv1.ResourceNotFound, "Waiting for namespace tigera-dex to be created", err, reqLogger)
 			return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 		} else {
-			r.SetDegraded(oprv1.ResourceReadError, "Error querying tigera-dex namespace", err, reqLogger)
+			status.SetDegraded(r.status, oprv1.ResourceReadError, "Error querying tigera-dex namespace", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
@@ -270,27 +269,27 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 		r.status.SetDegraded(string(oprv1.ResourceValidationError), "Only one of Authentication and ManagementClusterConnection may be specified")
 		return reconcile.Result{}, err
 	} else if err != nil {
-		r.SetDegraded(oprv1.ResourceReadError, "Error querying ManagementClusterConnection", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceReadError, "Error querying ManagementClusterConnection", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	// Secret used for TLS between dex and other components.
 	certificateManager, err := certificatemanager.Create(r.client, install, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(oprv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	dnsNames := dns.GetServiceDNSNames(render.DexObjectName, render.DexNamespace, r.clusterDomain)
 	tlsKeyPair, err := certificateManager.GetOrCreateKeyPair(r.client, render.DexTLSSecretName, common.OperatorNamespace(), dnsNames)
 	if err != nil {
-		r.SetDegraded(oprv1.ResourceReadError, "Unable to get or create tls key pair", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceReadError, "Unable to get or create tls key pair", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	// Dex will be configured with the contents of this secret, such as clientID and clientSecret.
 	idpSecret, err := utils.GetIdpSecret(ctx, r.client, authentication)
 	if err != nil {
-		r.SetDegraded(oprv1.ResourceValidationError, "Invalid or missing identity provider secret", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceValidationError, "Invalid or missing identity provider secret", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -300,14 +299,14 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 			// We need to render a new one.
 			dexSecret = render.CreateDexClientSecret()
 		} else {
-			r.SetDegraded(oprv1.ResourceReadError, "Failed to read tigera-operator/tigera-dex secret", err, reqLogger)
+			status.SetDegraded(r.status, oprv1.ResourceReadError, "Failed to read tigera-operator/tigera-dex secret", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
 
 	pullSecrets, err := utils.GetNetworkingPullSecrets(install, r.client)
 	if err != nil {
-		r.SetDegraded(oprv1.ResourceReadError, "Error retrieving pull secrets", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceReadError, "Error retrieving pull secrets", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -337,7 +336,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 	component := render.Dex(dexComponentCfg)
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, component); err != nil {
-		r.SetDegraded(oprv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, oprv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -354,7 +353,7 @@ func (r *ReconcileAuthentication) Reconcile(ctx context.Context, request reconci
 
 	for _, comp := range components {
 		if err = hlr.CreateOrUpdateOrDelete(context.Background(), comp, r.status); err != nil {
-			r.SetDegraded(oprv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
+			status.SetDegraded(r.status, oprv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
@@ -462,12 +461,4 @@ func validateAuthentication(authentication *oprv1.Authentication) error {
 	}
 
 	return nil
-}
-func (r *ReconcileAuthentication) SetDegraded(reason oprv1.TigeraStatusReason, message string, err error, log logr.Logger) {
-	log.WithValues(string(reason), message).Error(err, string(reason))
-	errormsg := ""
-	if err != nil {
-		errormsg = err.Error()
-	}
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/elastic/cloud-on-k8s/pkg/utils/stringsutil"
-	"github.com/go-logr/logr"
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	logstoragecommon "github.com/tigera/operator/pkg/controller/logstorage/common"
@@ -349,7 +348,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 		// Not finding the LogStorage CR is not an error, as a Managed cluster will not have this CR available but
 		// there are still "LogStorage" related items that need to be set up
 		if !errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceReadError, "An error occurred while querying LogStorage", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceReadError, "An error occurred while querying LogStorage", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 		ls = nil
@@ -363,7 +362,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 		fillDefaults(ls)
 		err = validateComponentResources(&ls.Spec)
 		if err != nil {
-			r.SetDegraded(operatorv1.ResourceValidationError, "An error occurred while validating LogStorage", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceValidationError, "An error occurred while validating LogStorage", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
@@ -371,16 +370,16 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 
 		// Write the logstorage back to the datastore
 		if err = r.client.Patch(ctx, ls, preDefaultPatchFrom); err != nil {
-			r.SetDegraded(operatorv1.ResourcePatchError, "Failed to write defaults", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourcePatchError, "Failed to write defaults", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
-	//Set the meta info in the tigerastatus like observedGenerations
+	// SetMetaData in the TigeraStatus like observedGenerations.
 	if ls != nil {
 		defer r.status.SetMetaData(&ls.ObjectMeta)
 	}
 
-	// Changes for updating logstorage status conditions
+	// Changes for updating LogStorage status conditions.
 	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
 		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
@@ -389,7 +388,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 		}
 		ls.Status.Conditions = status.UpdateStatusCondition(ls.Status.Conditions, ts.Status.Conditions)
 		if err := r.client.Status().Update(ctx, ls); err != nil {
-			log.WithValues("reason", err).Info("Failed to create logstorage status conditions.")
+			log.WithValues("reason", err).Info("Failed to create LogStorage status conditions.")
 			return reconcile.Result{}, err
 		}
 	}
@@ -397,10 +396,10 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 	variant, install, err := utils.GetInstallation(context.Background(), r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceNotFound, "Installation not found", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceNotFound, "Installation not found", err, reqLogger)
 			return reconcile.Result{}, err
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "An error occurred while querying Installation", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "An error occurred while querying Installation", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -429,19 +428,19 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	managementCluster, err := utils.GetManagementCluster(ctx, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	managementClusterConnection, err := utils.GetManagementClusterConnection(ctx, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error reading ManagementClusterConnection", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error reading ManagementClusterConnection", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if managementClusterConnection != nil && managementCluster != nil {
 		err = fmt.Errorf("having both a ManagementCluster and a ManagementClusterConnection is not supported")
-		r.SetDegraded(operatorv1.ResourceValidationError, "", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, "", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -461,19 +460,19 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	pullSecrets, err := utils.GetNetworkingPullSecrets(install, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "An error occurring while retrieving the pull secrets", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "An error occurring while retrieving the pull secrets", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	esService, err := r.getElasticsearchService(ctx)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to retrieve the Elasticsearch service", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to retrieve the Elasticsearch service", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	kbService, err := r.getKibanaService(ctx)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to retrieve the Kibana service", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to retrieve the Kibana service", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -490,7 +489,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 		esAdminUserSecret, err = utils.GetSecret(ctx, r.client, render.ElasticsearchAdminUserSecret, render.ElasticsearchNamespace)
 		if err != nil {
 			reqLogger.Error(err, "failed to get Elasticsearch admin user secret")
-			r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch admin user secret", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get Elasticsearch admin user secret", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 		if esAdminUserSecret != nil {
@@ -499,7 +498,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 
 		curatorSecrets, err = utils.ElasticsearchSecrets(context.Background(), []string{render.ElasticsearchCuratorUserSecret}, r.client)
 		if err != nil && !errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceReadError, "Failed to get curator credentials", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get curator credentials", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 
@@ -509,7 +508,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 			if errors.IsNotFound(err) {
 				reqLogger.Info("ConfigMap not found yet", "name", render.ECKLicenseConfigMapName)
 			} else {
-				r.SetDegraded(operatorv1.ResourceReadError, "Failed to get elastic license", err, reqLogger)
+				status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get elastic license", err, reqLogger)
 				return reconcile.Result{}, err
 			}
 		}
@@ -526,13 +525,13 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 
 	authentication, err := utils.GetAuthentication(ctx, r.client)
 	if err != nil && !errors.IsNotFound(err) {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error while fetching Authentication", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error while fetching Authentication", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	certificateManager, err := certificatemanager.Create(r.client, install, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	certificateManager.AddToStatusManager(r.status, render.ElasticsearchNamespace)
@@ -563,7 +562,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 		// Write the logstorage back to the datastore
 		if patchErr := r.client.Patch(ctx, ls, preDefaultPatchFrom); patchErr != nil {
 			reqLogger.Error(patchErr, "Error patching the log-storage")
-			r.SetDegraded(operatorv1.ResourcePatchError, "Error patching the log-storage", patchErr, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourcePatchError, "Error patching the log-storage", patchErr, reqLogger)
 			return reconcile.Result{}, patchErr
 		}
 	}
@@ -633,7 +632,7 @@ func (r *ReconcileLogStorage) Reconcile(ctx context.Context, request reconcile.R
 	if ls != nil && (ls.DeletionTimestamp == nil || len(ls.GetFinalizers()) > 0) {
 		ls.Status.State = operatorv1.TigeraStatusReady
 		if err := r.client.Status().Update(ctx, ls); err != nil {
-			r.SetDegraded(operatorv1.ResourceUpdateError, fmt.Sprintf("Error updating the log-storage status %s", operatorv1.TigeraStatusReady), err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceUpdateError, fmt.Sprintf("Error updating the log-storage status %s", operatorv1.TigeraStatusReady), err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
@@ -698,13 +697,4 @@ func (r *ReconcileLogStorage) checkOIDCUsersEsResource(ctx context.Context) erro
 		return err
 	}
 	return nil
-}
-
-func (r *ReconcileLogStorage) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
-	log.WithValues(string(reason), message).Error(err, string(reason))
-	errormsg := ""
-	if err != nil {
-		errormsg = err.Error()
-	}
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

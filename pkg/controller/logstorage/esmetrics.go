@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/tigera/operator/pkg/controller/status"
+
 	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +50,7 @@ func (r *ReconcileLogStorage) createEsMetrics(
 ) (reconcile.Result, bool, error) {
 	esMetricsSecret, err := utils.GetSecret(context.Background(), r.client, esmetrics.ElasticsearchMetricsSecret, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to retrieve Elasticsearch metrics user secret.", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to retrieve Elasticsearch metrics user secret.", err, reqLogger)
 		return reconcile.Result{}, false, err
 	} else if esMetricsSecret == nil {
 		reqLogger.Info("Waiting for elasticsearch metrics secrets to become available")
@@ -58,12 +60,12 @@ func (r *ReconcileLogStorage) createEsMetrics(
 
 	certificateManager, err := certificatemanager.Create(r.client, install, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 	prometheusCertificate, err := certificateManager.GetCertificate(r.client, monitor.PrometheusClientTLSSecretName, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get certificate", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get certificate", err, reqLogger)
 		return reconcile.Result{}, false, err
 	} else if prometheusCertificate == nil {
 		reqLogger.Info("Prometheus secrets are not available yet, waiting until they become available")
@@ -72,7 +74,7 @@ func (r *ReconcileLogStorage) createEsMetrics(
 	}
 	esgwCertificate, err := certificateManager.GetCertificate(r.client, relasticsearch.PublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
 		return reconcile.Result{}, false, err
 	} else if esgwCertificate == nil {
 		log.Info("Elasticsearch gateway certificate is not available yet, waiting until they become available")
@@ -87,7 +89,7 @@ func (r *ReconcileLogStorage) createEsMetrics(
 		common.OperatorNamespace(),
 		dns.GetServiceDNSNames(esmetrics.ElasticsearchMetricsName, render.ElasticsearchNamespace, clusterDomain))
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error finding or creating TLS certificate", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error finding or creating TLS certificate", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
@@ -113,13 +115,13 @@ func (r *ReconcileLogStorage) createEsMetrics(
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, esMetricsComponent); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	for _, comp := range components {
 		if err := hdler.CreateOrUpdateOrDelete(ctx, comp, r.status); err != nil {
-			r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
 			return reconcile.Result{}, false, err
 		}
 	}

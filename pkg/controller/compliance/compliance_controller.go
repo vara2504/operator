@@ -23,7 +23,6 @@ import (
 	"github.com/tigera/operator/pkg/render/common/networkpolicy"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/go-logr/logr"
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -215,18 +214,18 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 			r.status.OnCRNotFound()
 			return reconcile.Result{}, nil
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "Error querying compliance", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error querying compliance", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	r.status.OnCRFound()
 	reqLogger.V(2).Info("Loaded config", "config", instance)
 
-	//Set the meta info in the tigerastatus like observedGenerations
+	// SetMetaData in the TigeraStatus like observedGenerations.
 	if instance != nil {
 		defer r.status.SetMetaData(&instance.ObjectMeta)
 	}
 
-	// Changes for updating compliance status conditions
+	// Changes for updating Compliance status conditions.
 	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
 		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
@@ -235,7 +234,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 		}
 		instance.Status.Conditions = status.UpdateStatusCondition(instance.Status.Conditions, ts.Status.Conditions)
 		if err := r.client.Status().Update(ctx, instance); err != nil {
-			log.WithValues("reason", err).Info("Failed to create compliance status conditions.")
+			log.WithValues("reason", err).Info("Failed to create Compliance status conditions.")
 			return reconcile.Result{}, err
 		}
 	}
@@ -270,10 +269,10 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	license, err := utils.FetchLicenseKey(ctx, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceNotFound, "License not found", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceNotFound, "License not found", err, reqLogger)
 			return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "Error querying license", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error querying license", err, reqLogger)
 		return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
@@ -281,26 +280,26 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	variant, network, err := utils.GetInstallation(ctx, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceNotFound, "Installation not found", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceNotFound, "Installation not found", err, reqLogger)
 			return reconcile.Result{}, err
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "Error querying installation", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error querying installation", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	pullSecrets, err := utils.GetNetworkingPullSecrets(network, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to retrieve pull secrets", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to retrieve pull secrets", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	esClusterConfig, err := utils.GetElasticsearchClusterConfig(ctx, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceNotReady, "Elasticsearch cluster configuration is not available, waiting for it to become available", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceNotReady, "Elasticsearch cluster configuration is not available, waiting for it to become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get the elasticsearch cluster configuration", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get the elasticsearch cluster configuration", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -311,19 +310,19 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 
 	managementCluster, err := utils.GetManagementCluster(ctx, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	managementClusterConnection, err := utils.GetManagementClusterConnection(ctx, r.client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error reading ManagementClusterConnection", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error reading ManagementClusterConnection", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if managementClusterConnection != nil && managementCluster != nil {
 		err = fmt.Errorf("having both a ManagementCluster and a ManagementClusterConnection is not supported")
-		r.SetDegraded(operatorv1.ResourceValidationError, "", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, "", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -335,29 +334,29 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	esSecrets, err := utils.ElasticsearchSecrets(ctx, secretsToWatch, r.client)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.SetDegraded(operatorv1.ResourceNotReady, "Elasticsearch secrets are not available yet, waiting until they become available", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceNotReady, "Elasticsearch secrets are not available yet, waiting until they become available", err, reqLogger)
 			return reconcile.Result{}, nil
 		}
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get Elasticsearch credentials", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get Elasticsearch credentials", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	certificateManager, err := certificatemanager.Create(r.client, network, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	var managerInternalTLSSecret certificatemanagement.CertificateInterface
 	if managementCluster != nil {
 		managerInternalTLSSecret, err = certificateManager.GetCertificate(r.client, render.ManagerInternalTLSSecretName, common.OperatorNamespace())
 		if err != nil {
-			r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("failed to retrieve / validate  %s", render.ManagerInternalTLSSecretName), err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceValidationError, fmt.Sprintf("failed to retrieve / validate  %s", render.ManagerInternalTLSSecretName), err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
 	esgwCertificate, err := certificateManager.GetCertificate(r.client, relasticsearch.PublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
 		return reconcile.Result{}, err
 	} else if esgwCertificate == nil {
 		log.Info("Elasticsearch gateway certificate is not available yet, waiting until they become available")
@@ -374,7 +373,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 			common.OperatorNamespace(),
 			dns.GetServiceDNSNames(render.ComplianceServiceName, render.ComplianceNamespace, r.clusterDomain))
 		if err != nil {
-			r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("failed to retrieve / validate  %s", render.ComplianceServerCertSecret), err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceValidationError, fmt.Sprintf("failed to retrieve / validate  %s", render.ComplianceServerCertSecret), err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
@@ -383,7 +382,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	// Fetch the Authentication spec. If present, we use to configure user authentication.
 	authenticationCR, err := utils.GetAuthentication(ctx, r.client)
 	if err != nil && !errors.IsNotFound(err) {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error querying Authentication", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error querying Authentication", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	if authenticationCR != nil && authenticationCR.Status.State != operatorv1.TigeraStatusReady {
@@ -396,7 +395,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 
 	keyValidatorConfig, err := utils.GetKeyValidatorConfig(ctx, r.client, authenticationCR, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Failed to process the authentication CR.", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, "Failed to process the authentication CR.", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -421,12 +420,12 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 	// Render the desired objects from the CRD and create or update them.
 	comp, err := render.Compliance(complianceCfg)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceRenderingError, "Error rendering Compliance", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceRenderingError, "Error rendering Compliance", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if err = imageset.ApplyImageSet(ctx, r.client, variant, comp); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 	certificateComponent := rcertificatemanagement.CertificateManagement(&rcertificatemanagement.Config{
@@ -440,7 +439,7 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 
 	for _, comp := range []render.Component{comp, certificateComponent} {
 		if err := handler.CreateOrUpdateOrDelete(ctx, comp, r.status); err != nil {
-			r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating / deleting resource", err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error creating / updating / deleting resource", err, reqLogger)
 			return reconcile.Result{}, err
 		}
 	}
@@ -466,13 +465,4 @@ func (r *ReconcileCompliance) Reconcile(ctx context.Context, request reconcile.R
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil
-}
-
-func (r *ReconcileCompliance) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
-	log.WithValues(string(reason), message).Error(err, string(reason))
-	errormsg := ""
-	if err != nil {
-		errormsg = err.Error()
-	}
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }

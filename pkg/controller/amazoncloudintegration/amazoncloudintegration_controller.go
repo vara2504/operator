@@ -144,12 +144,12 @@ func (r *ReconcileAmazonCloudIntegration) Reconcile(ctx context.Context, request
 		return reconcile.Result{}, err
 	}
 	r.status.OnCRFound()
-	//Set the meta info in the tigerastatus like observedGenerations
+	// SetMetaData in the TigeraStatus like observedGenerations.
 	if instance != nil {
 		defer r.status.SetMetaData(&instance.ObjectMeta)
 	}
 
-	// Changes for updating application layer status conditions
+	// Changes for updating AmazonCloudIntegration status conditions.
 	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
 		err := r.client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
@@ -218,15 +218,11 @@ func (r *ReconcileAmazonCloudIntegration) Reconcile(ctx context.Context, request
 		PullSecrets:            pullSecrets,
 		Openshift:              r.provider == operatorv1.ProviderOpenShift,
 	}
-	component, err := render.AmazonCloudIntegration(amazonCloudIntegrationCfg)
-	if err != nil {
-		r.SetDegraded(operatorv1.ResourceRenderingError, "Error rendering AmazonCloudIntegration", err, reqLogger)
-		return reconcile.Result{}, err
-	}
+	component := render.AmazonCloudIntegration(amazonCloudIntegrationCfg)
 
 	err = imageset.ApplyImageSet(ctx, r.client, variant, component)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
+		r.SetDegraded(operatorv1.ImageSetError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 

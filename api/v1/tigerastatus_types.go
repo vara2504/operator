@@ -135,6 +135,7 @@ const (
 	InternalServerError       TigeraStatusReason = "InternalServerError"
 	NotApplicable             TigeraStatusReason = "NotApplicable"
 	Unknown                   TigeraStatusReason = "Unknown"
+	ImageSetError             TigeraStatusReason = "ImageSetError"
 )
 
 func init() {

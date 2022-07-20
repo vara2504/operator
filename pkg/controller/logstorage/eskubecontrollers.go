@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/tigera/operator/pkg/controller/status"
+
 	"github.com/go-logr/logr"
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
@@ -44,7 +46,7 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 ) (reconcile.Result, bool, error) {
 	kubeControllersUserSecret, err := utils.GetSecret(ctx, r.client, kubecontrollers.ElasticsearchKubeControllersUserSecret, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Failed to get kube controllers gateway secret", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Failed to get kube controllers gateway secret", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
@@ -56,7 +58,7 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 
 	certificateManager, err := certificatemanager.Create(r.client, install, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
@@ -65,13 +67,13 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 		svcDNSNames := append(dns.GetServiceDNSNames(render.ManagerServiceName, render.ManagerNamespace, r.clusterDomain), render.ManagerServiceIP)
 		managerInternalTLSSecret, err = certificateManager.GetOrCreateKeyPair(r.client, render.ManagerInternalTLSSecretName, common.CalicoNamespace, svcDNSNames)
 		if err != nil {
-			r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("Error ensuring internal manager TLS certificate %q exists and has valid DNS names", render.ManagerInternalTLSSecretName), err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceValidationError, fmt.Sprintf("Error ensuring internal manager TLS certificate %q exists and has valid DNS names", render.ManagerInternalTLSSecretName), err, reqLogger)
 			return reconcile.Result{}, false, err
 		}
 	}
 	esgwCertificate, err := certificateManager.GetCertificate(r.client, relasticsearch.PublicCertSecret, common.OperatorNamespace())
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, fmt.Sprintf("Failed to retrieve / validate  %s", relasticsearch.PublicCertSecret), err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 	trustedBundle := certificateManager.CreateTrustedBundle(esgwCertificate)
@@ -92,22 +94,22 @@ func (r *ReconcileLogStorage) createEsKubeControllers(
 
 	imageSet, err := imageset.GetImageSet(ctx, r.client, install.Variant)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error getting ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error getting ImageSet", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err = imageset.ValidateImageSet(imageSet); err != nil {
-		r.SetDegraded(operatorv1.ResourceValidationError, "Error validating ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, "Error validating ImageSet", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err = imageset.ResolveImages(imageSet, esKubeControllerComponents); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error resolving ImageSet for elasticsearch kube-controllers components", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error resolving ImageSet for elasticsearch kube-controllers components", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 
 	if err := hdler.CreateOrUpdateOrDelete(ctx, esKubeControllerComponents, nil); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating  elasticsearch kube-controllers resource", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error creating / updating  elasticsearch kube-controllers resource", err, reqLogger)
 		return reconcile.Result{}, false, err
 	}
 

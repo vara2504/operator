@@ -23,7 +23,6 @@ import (
 	"github.com/tigera/operator/pkg/render/common/networkpolicy"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/go-logr/logr"
 	operatorv1 "github.com/tigera/operator/api/v1"
 	"github.com/tigera/operator/pkg/common"
 	"github.com/tigera/operator/pkg/controller/certificatemanager"
@@ -197,25 +196,25 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 
 	managementCluster, err := utils.GetManagementCluster(ctx, r.Client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error reading ManagementCluster", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	// Fetch the managementClusterConnection.
 	managementClusterConnection, err := utils.GetManagementClusterConnection(ctx, r.Client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error querying ManagementClusterConnection", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error querying ManagementClusterConnection", err, reqLogger)
 		return result, err
 	} else if managementClusterConnection == nil {
 		r.status.OnCRNotFound()
 		return result, nil
 	}
-	//Set the meta info in the tigerastatus like observedGenerations
+	// SetMetaData in the TigeraStatus like observedGenerations.
 	if managementClusterConnection != nil {
 		defer r.status.SetMetaData(&managementClusterConnection.ObjectMeta)
 	}
 
-	// Changes for updating managementClusterConnection status conditions
+	// Changes for updating ManagementClusterConnection status conditions.
 	if request.Name == ResourceName && request.Namespace == "" {
 		ts := &operatorv1.TigeraStatus{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: ResourceName}, ts)
@@ -224,14 +223,14 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 		}
 		managementClusterConnection.Status.Conditions = status.UpdateStatusCondition(managementClusterConnection.Status.Conditions, ts.Status.Conditions)
 		if err := r.Client.Status().Update(ctx, managementClusterConnection); err != nil {
-			log.WithValues("reason", err).Info("Failed to create managementClusterConnection status conditions.")
+			log.WithValues("reason", err).Info("Failed to create ManagementClusterConnection status conditions.")
 			return reconcile.Result{}, err
 		}
 	}
 
 	if managementClusterConnection != nil && managementCluster != nil {
 		err = fmt.Errorf("having both a ManagementCluster and a ManagementClusterConnection is not supported")
-		r.SetDegraded(operatorv1.ResourceValidationError, "", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceValidationError, "", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -240,13 +239,13 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 
 	pullSecrets, err := utils.GetNetworkingPullSecrets(instl, r.Client)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error retrieving pull secrets", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error retrieving pull secrets", err, reqLogger)
 		return result, err
 	}
 
 	certificateManager, err := certificatemanager.Create(r.Client, instl, r.clusterDomain)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceCreateError, "Unable to create the Tigera CA", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
@@ -254,7 +253,7 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 	tunnelSecret := &corev1.Secret{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: render.GuardianSecretName, Namespace: common.OperatorNamespace()}, tunnelSecret)
 	if err != nil {
-		r.SetDegraded(operatorv1.ResourceReadError, "Error retrieving secrets from guardian namespace", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceReadError, "Error retrieving secrets from guardian namespace", err, reqLogger)
 		if !k8serrors.IsNotFound(err) {
 			return result, nil
 		}
@@ -265,7 +264,7 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 	for _, secretName := range []string{render.PacketCaptureCertSecret, render.PrometheusTLSSecretName} {
 		secret, err := certificateManager.GetCertificate(r.Client, secretName, common.OperatorNamespace())
 		if err != nil {
-			r.SetDegraded(operatorv1.ResourceReadError, fmt.Sprintf("Failed to retrieve %s", secretName), err, reqLogger)
+			status.SetDegraded(r.status, operatorv1.ResourceReadError, fmt.Sprintf("Failed to retrieve %s", secretName), err, reqLogger)
 			return reconcile.Result{}, err
 		} else if secret == nil {
 			reqLogger.Info(fmt.Sprintf("Waiting for secret '%s' to become available", secretName))
@@ -349,12 +348,12 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 	component := render.Guardian(guardianCfg)
 
 	if err = imageset.ApplyImageSet(ctx, r.Client, variant, component); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error with images from ImageSet", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
 	if err := ch.CreateOrUpdateOrDelete(ctx, component, r.status); err != nil {
-		r.SetDegraded(operatorv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
+		status.SetDegraded(r.status, operatorv1.ResourceUpdateError, "Error creating / updating resource", err, reqLogger)
 		return result, err
 	}
 
@@ -363,7 +362,6 @@ func (r *ReconcileConnection) Reconcile(ctx context.Context, request reconcile.R
 	// We should create the Guardian deployment.
 	return result, nil
 }
-
 func managementClusterAddrHasDomain(connection *operatorv1.ManagementClusterConnection) (bool, error) {
 	host, _, err := net.SplitHostPort(connection.Spec.ManagementClusterAddr)
 	if err != nil {
@@ -371,12 +369,4 @@ func managementClusterAddrHasDomain(connection *operatorv1.ManagementClusterConn
 	}
 
 	return net.ParseIP(host) == nil, nil
-}
-func (r *ReconcileConnection) SetDegraded(reason operatorv1.TigeraStatusReason, message string, err error, log logr.Logger) {
-	log.WithValues(string(reason), message).Error(err, string(reason))
-	errormsg := ""
-	if err != nil {
-		errormsg = err.Error()
-	}
-	r.status.SetDegraded(string(reason), fmt.Sprintf("%s - Error: %s", message, errormsg))
 }
