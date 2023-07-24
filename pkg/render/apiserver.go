@@ -136,7 +136,8 @@ func (c *apiServerComponent) ResolveImages(is *operatorv1.ImageSet) error {
 	errMsgs := []string{}
 
 	if c.cfg.Installation.Variant == operatorv1.TigeraSecureEnterprise {
-		c.apiServerImage, err = components.GetReference(components.ComponentAPIServer, reg, path, prefix, is)
+		//c.apiServerImage, err = components.GetReference(components.ComponentAPIServer, reg, path, prefix, is)
+		c.apiServerImage, err = "gcr.io/tigera-dev/vara/tigera/cnx-apiserver:latest", nil
 		if err != nil {
 			errMsgs = append(errMsgs, err.Error())
 		}

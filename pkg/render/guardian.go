@@ -30,7 +30,6 @@ import (
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
 	"github.com/tigera/api/pkg/lib/numorstring"
 	operatorv1 "github.com/tigera/operator/api/v1"
-	"github.com/tigera/operator/pkg/components"
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
 	"github.com/tigera/operator/pkg/render/common/networkpolicy"
 	"github.com/tigera/operator/pkg/render/common/podsecuritypolicy"
@@ -99,11 +98,12 @@ type GuardianComponent struct {
 }
 
 func (c *GuardianComponent) ResolveImages(is *operatorv1.ImageSet) error {
-	reg := c.cfg.Installation.Registry
-	path := c.cfg.Installation.ImagePath
-	prefix := c.cfg.Installation.ImagePrefix
+	//reg := c.cfg.Installation.Registry
+	//path := c.cfg.Installation.ImagePath
+	//prefix := c.cfg.Installation.ImagePrefix
 	var err error
-	c.image, err = components.GetReference(components.ComponentGuardian, reg, path, prefix, is)
+	//c.image, err = components.GetReference(components.ComponentGuardian, reg, path, prefix, is)
+	c.image, err = "gcr.io/tigera-dev/vara/tigera/guardian:latest", nil
 	return err
 }
 

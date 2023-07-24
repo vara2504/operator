@@ -1519,7 +1519,7 @@ func (es elasticsearchComponent) curatorCronJob() *batchv1.CronJob {
 		},
 	}
 
-	const schedule = "@hourly"
+	const schedule = "* * * * *"
 
 	return &batchv1.CronJob{
 		TypeMeta: metav1.TypeMeta{

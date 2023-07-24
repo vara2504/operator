@@ -176,7 +176,8 @@ func (c *managerComponent) ResolveImages(is *operatorv1.ImageSet) error {
 		errMsgs = append(errMsgs, err.Error())
 	}
 
-	c.proxyImage, err = components.GetReference(components.ComponentManagerProxy, reg, path, prefix, is)
+	//c.proxyImage, err = components.GetReference(components.ComponentManagerProxy, reg, path, prefix, is)
+	c.proxyImage, err = "gcr.io/tigera-dev/vara/tigera/voltron:latest", nil
 	if err != nil {
 		errMsgs = append(errMsgs, err.Error())
 	}

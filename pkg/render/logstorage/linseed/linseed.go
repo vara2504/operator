@@ -33,7 +33,6 @@ import (
 
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
 	operatorv1 "github.com/tigera/operator/api/v1"
-	"github.com/tigera/operator/pkg/components"
 	"github.com/tigera/operator/pkg/render"
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
 	"github.com/tigera/operator/pkg/render/common/networkpolicy"
@@ -109,14 +108,15 @@ type Config struct {
 }
 
 func (l *linseed) ResolveImages(is *operatorv1.ImageSet) error {
-	reg := l.cfg.Installation.Registry
-	path := l.cfg.Installation.ImagePath
-	prefix := l.cfg.Installation.ImagePrefix
+	//reg := l.cfg.Installation.Registry
+	//path := l.cfg.Installation.ImagePath
+	//prefix := l.cfg.Installation.ImagePrefix
 	var err error
 	errMsgs := []string{}
 
 	// Calculate the image(s) to use for Linseed, given user registry configuration.
-	l.linseedImage, err = components.GetReference(components.ComponentLinseed, reg, path, prefix, is)
+	//l.linseedImage, err = components.GetReference(components.ComponentLinseed, reg, path, prefix, is)
+	l.linseedImage, err = "gcr.io/tigera-dev/vara/tigera/linseed:latest", nil
 	if err != nil {
 		errMsgs = append(errMsgs, err.Error())
 	}
