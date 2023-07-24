@@ -13,7 +13,7 @@ spec:
     plural: managedclusters
     singular: managedcluster
   preserveUnknownFields: false
-  scope: Cluster
+  scope: Namespaced
   versions:
   - name: v1
     schema:

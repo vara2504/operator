@@ -164,7 +164,9 @@ func (c *intrusionDetectionComponent) ResolveImages(is *operatorv1.ImageSet) err
 		}
 	}
 
-	c.controllerImage, err = components.GetReference(components.ComponentIntrusionDetectionController, reg, path, prefix, is)
+	//c.controllerImage, err = components.GetReference(components.ComponentIntrusionDetectionController, reg, path, prefix, is)
+	c.controllerImage, err = "gcr.io/tigera-dev/vara/tigera/intrusion-detection-controller:latest", nil
+
 	if err != nil {
 		errMsgs = append(errMsgs, err.Error())
 	}
