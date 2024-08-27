@@ -565,6 +565,7 @@ func (es elasticsearchComponent) podTemplate() corev1.PodTemplateSpec {
 		)
 		// Make the pod mount the serviceaccount token of tigera-elasticsearch. On behalf of it, CSRs will be submitted.
 		autoMountToken = true
+
 		volumes = append(volumes, corev1.Volume{
 			Name: csrRootCAConfigMapName,
 			VolumeSource: corev1.VolumeSource{
@@ -587,6 +588,12 @@ func (es elasticsearchComponent) podTemplate() corev1.PodTemplateSpec {
 		nodeSels = es.cfg.LogStorage.Spec.DataNodeSelector
 	}
 
+	var (
+		runAsFSGroupID int64 = 1000
+		runAsGroupID   int64 = 0
+		runAsUserID    int64 = 1000
+	)
+
 	podTemplate := corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: annotations,
@@ -600,6 +607,11 @@ func (es elasticsearchComponent) podTemplate() corev1.PodTemplateSpec {
 			ServiceAccountName:           ElasticsearchObjectName,
 			Volumes:                      volumes,
 			AutomountServiceAccountToken: &autoMountToken,
+			SecurityContext: &corev1.PodSecurityContext{
+				FSGroup:    &runAsFSGroupID,
+				RunAsGroup: &runAsGroupID,
+				RunAsUser:  &runAsUserID,
+			},
 		},
 	}
 
@@ -796,9 +808,11 @@ func (es elasticsearchComponent) nodeSets() []esv1.NodeSet {
 // NodeSet
 func (es elasticsearchComponent) nodeSetTemplate(pvcTemplate corev1.PersistentVolumeClaim) esv1.NodeSet {
 	config := map[string]interface{}{
-		"node.master":                 "true",
-		"node.data":                   "true",
-		"node.ingest":                 "true",
+		"node.roles": []string{
+			"data",
+			"ingest",
+			"master",
+		},
 		"cluster.max_shards_per_node": 10000,
 		// Disable geoip downloader. This removes an error from the startup logs, because our network policy blocks it.
 		"ingest.geoip.downloader.enabled": false,
