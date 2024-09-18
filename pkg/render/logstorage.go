@@ -812,6 +812,7 @@ func (es elasticsearchComponent) nodeSetTemplate(pvcTemplate corev1.PersistentVo
 			"data",
 			"ingest",
 			"master",
+			"remote_cluster_client",
 		},
 		"cluster.max_shards_per_node": 10000,
 		// Disable geoip downloader. This removes an error from the startup logs, because our network policy blocks it.
