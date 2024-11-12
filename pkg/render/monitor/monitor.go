@@ -297,7 +297,6 @@ func (mc *monitorComponent) prometheusOperatorClusterRole() *rbacv1.ClusterRole 
 			APIGroups: []string{""},
 			Resources: []string{
 				"configmaps",
-				"secrets",
 			},
 			Verbs: []string{"*"},
 		},
@@ -969,6 +968,20 @@ func (mc *monitorComponent) operatorRole() *rbacv1.Role {
 					"prometheusrules",
 					"servicemonitors",
 					"thanosrulers",
+				},
+				Verbs: []string{
+					"create",
+					"delete",
+					"get",
+					"list",
+					"update",
+					"watch",
+				},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{
+					"secrets",
 				},
 				Verbs: []string{
 					"create",

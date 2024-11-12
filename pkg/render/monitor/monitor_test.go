@@ -237,7 +237,6 @@ var _ = Describe("monitor rendering tests", func() {
 			APIGroups: []string{""},
 			Resources: []string{
 				"configmaps",
-				"secrets",
 			},
 			Verbs: []string{"*"},
 		}))
@@ -568,7 +567,7 @@ var _ = Describe("monitor rendering tests", func() {
 		// Role
 		roleObj, ok := rtest.GetResource(toCreate, monitor.TigeraPrometheusRole, common.TigeraPrometheusNamespace, "rbac.authorization.k8s.io", "v1", "Role").(*rbacv1.Role)
 		Expect(ok).To(BeTrue())
-		Expect(roleObj.Rules).To(HaveLen(1))
+		Expect(roleObj.Rules).To(HaveLen(2))
 		Expect(roleObj.Rules[0].APIGroups).To(HaveLen(1))
 		Expect(roleObj.Rules[0].APIGroups[0]).To(Equal("monitoring.coreos.com"))
 		Expect(roleObj.Rules[0].Resources).To(HaveLen(6))
@@ -582,6 +581,21 @@ var _ = Describe("monitor rendering tests", func() {
 		}))
 		Expect(roleObj.Rules[0].Verbs).To(HaveLen(6))
 		Expect(roleObj.Rules[0].Verbs).To(BeEquivalentTo([]string{
+			"create",
+			"delete",
+			"get",
+			"list",
+			"update",
+			"watch",
+		}))
+		Expect(roleObj.Rules[1].APIGroups).To(HaveLen(1))
+		Expect(roleObj.Rules[1].APIGroups[0]).To(Equal(""))
+		Expect(roleObj.Rules[1].Resources).To(HaveLen(1))
+		Expect(roleObj.Rules[1].Resources).To(BeEquivalentTo([]string{
+			"secrets",
+		}))
+		Expect(roleObj.Rules[1].Verbs).To(HaveLen(6))
+		Expect(roleObj.Rules[1].Verbs).To(BeEquivalentTo([]string{
 			"create",
 			"delete",
 			"get",
