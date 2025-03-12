@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2023-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	esv1 "github.com/elastic/cloud-on-k8s/v2/pkg/apis/elasticsearch/v1"
 
 	v3 "github.com/tigera/api/pkg/apis/projectcalico/v3"
-	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -287,17 +286,6 @@ func (r *ESKubeControllersController) Reconcile(ctx context.Context, request rec
 		}
 	}
 
-	// Get secrets needed for kube-controllers to talk to elastic. This is needed for zero-tenants and single-tenants
-	// that deploy es-kube-controllers and need to talk to es-gateway
-	var kubeControllersUserSecret *core.Secret
-	if !r.multiTenant {
-		kubeControllersUserSecret, err = utils.GetSecret(ctx, r.client, kubecontrollers.ElasticsearchKubeControllersUserSecret, helper.TruthNamespace())
-		if err != nil {
-			r.status.SetDegraded(operatorv1.ResourceReadError, "Failed to get kube controllers gateway secret", err, reqLogger)
-			return reconcile.Result{}, err
-		}
-	}
-
 	// Collect the certificates we need to provision es-kube-controllers. These will have been provisioned already by the ES secrets controller.
 	opts := []certificatemanager.Option{
 		certificatemanager.WithLogger(reqLogger),
@@ -360,6 +348,14 @@ func (r *ESKubeControllersController) Reconcile(ctx context.Context, request rec
 	// Determine the namespaces to which we must bind the cluster role.
 	namespaces, err := helper.TenantNamespaces(r.client)
 	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// Get secrets needed for kube-controllers to talk to elastic. This is needed for zero-tenants and single-tenants
+	// that deploy es-kube-controllers and need to talk to es-gateway
+	kubeControllersUserSecret, err := utils.GetSecret(ctx, r.client, kubecontrollers.ElasticsearchKubeControllersUserSecret, helper.TruthNamespace())
+	if err != nil {
+		r.status.SetDegraded(operatorv1.ResourceReadError, "Failed to get kube controllers gateway secret", err, reqLogger)
 		return reconcile.Result{}, err
 	}
 
