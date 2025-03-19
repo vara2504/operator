@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2023-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,9 +108,23 @@ func (pr *policyRecommendationComponent) SupportedOSType() rmeta.OSType {
 }
 
 func (pr *policyRecommendationComponent) Objects() ([]client.Object, []client.Object) {
+
+	var objs []client.Object
+
+	if pr.cfg.ManagedCluster {
+		// For Managed cluster create the required Service Account in calico-system
+		objs = []client.Object{
+			pr.serviceAccount(),
+			pr.clusterRole(),
+			pr.clusterRoleBinding(),
+		}
+		return objs, nil
+	}
+
 	// Management and managed clusters need API access to the resources defined in the policy
 	// recommendation cluster role
-	objs := []client.Object{
+
+	objs = []client.Object{
 		CreateNamespace(pr.cfg.Namespace, pr.cfg.Installation.KubernetesProvider, PSSRestricted, pr.cfg.Installation.Azure),
 		CreateOperatorSecretsRoleBinding(pr.cfg.Namespace),
 
@@ -381,9 +395,13 @@ func (pr *policyRecommendationComponent) policyRecommendationAnnotations() map[s
 }
 
 func (pr *policyRecommendationComponent) serviceAccount() client.Object {
+	namespace := pr.cfg.Namespace
+	if pr.cfg.ManagedCluster {
+		namespace = "calico-system"
+	}
 	return &corev1.ServiceAccount{
 		TypeMeta:   metav1.TypeMeta{Kind: "ServiceAccount", APIVersion: "v1"},
-		ObjectMeta: metav1.ObjectMeta{Name: PolicyRecommendationName, Namespace: pr.cfg.Namespace},
+		ObjectMeta: metav1.ObjectMeta{Name: PolicyRecommendationName, Namespace: namespace},
 	}
 }
 
