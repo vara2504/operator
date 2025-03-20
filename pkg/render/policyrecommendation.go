@@ -246,7 +246,11 @@ func (pr *policyRecommendationComponent) clusterRole() client.Object {
 }
 
 func (pr *policyRecommendationComponent) clusterRoleBinding() client.Object {
-	return rcomponents.ClusterRoleBinding(PolicyRecommendationName, PolicyRecommendationName, PolicyRecommendationNamespace, pr.cfg.BindingNamespaces)
+	namespaces := pr.cfg.BindingNamespaces
+	if pr.cfg.ManagedCluster {
+		namespaces = []string{"calico-system"}
+	}
+	return rcomponents.ClusterRoleBinding(PolicyRecommendationName, PolicyRecommendationName, PolicyRecommendationNamespace, namespaces)
 }
 
 func (pr *policyRecommendationComponent) multiTenantManagedClustersAccess() []client.Object {

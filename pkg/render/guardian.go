@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2020-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -137,10 +137,10 @@ func (c *GuardianComponent) Objects() ([]client.Object, []client.Object) {
 
 		// Add tigera-manager service account for impersonation. In managed clusters, the tigera-manager
 		// service account is always within the tigera-manager namespace - regardless of (multi)tenancy mode.
-		CreateNamespace(ManagerNamespace, c.cfg.Installation.KubernetesProvider, PSSRestricted, c.cfg.Installation.Azure),
-		managerServiceAccount(ManagerNamespace),
+		//CreateNamespace(ManagerNamespace, c.cfg.Installation.KubernetesProvider, PSSRestricted, c.cfg.Installation.Azure),
+		managerServiceAccount("calico-system"),
 		managerClusterRole(true, c.cfg.Installation.KubernetesProvider, nil),
-		managerClusterRoleBinding([]string{ManagerNamespace}),
+		managerClusterRoleBinding([]string{"calico-system"}),
 
 		// Install default UI settings for this managed cluster.
 		managerClusterWideSettingsGroup(),
