@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2021-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package elasticsearch
 import (
 	"fmt"
 
+	"github.com/tigera/operator/pkg/common"
 	rmeta "github.com/tigera/operator/pkg/render/common/meta"
 )
 
@@ -27,11 +28,15 @@ const (
 	linseedFQDNEndpoint = "https://tigera-linseed.%s.svc.%s"
 )
 
-func LinseedEndpoint(osType rmeta.OSType, clusterDomain, namespace string) string {
-	if osType == rmeta.OSTypeWindows {
-		return fmt.Sprintf(linseedFQDNEndpoint, namespace, clusterDomain)
+func LinseedEndpoint(osType rmeta.OSType, clusterDomain, namespace string, isManagedCluster bool) string {
+	ns := namespace
+	if isManagedCluster {
+		ns = common.CalicoNamespace
 	}
-	return fmt.Sprintf(linseedEndpoint, namespace)
+	if osType == rmeta.OSTypeWindows {
+		return fmt.Sprintf(linseedFQDNEndpoint, ns, clusterDomain)
+	}
+	return fmt.Sprintf(linseedEndpoint, ns)
 }
 
 // GatewayEndpoint returns the endpoint for the Elasticsearch service. For

@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2023-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -429,6 +429,12 @@ func (r *SecretSubController) generateSecrets(
 	// This fetches the existing key pair from the truth namespace if it exists, or generates a new one in-memory otherwise.
 	// It will be provisioned into the cluster in the render stage later on.
 	linseedDNSNames := dns.GetServiceDNSNames(render.LinseedServiceName, helper.InstallNamespace(), r.clusterDomain)
+
+	// Include Guardian DNS if this is a management cluster. Add a check
+	// In a managed cluster, the Elasticsearch ExternalService will be in the calico-system namespace.
+	linseedGuardianDNSName := dns.GetServiceDNSNames(render.LinseedServiceName, common.CalicoNamespace, r.clusterDomain)
+	linseedDNSNames = append(linseedDNSNames, linseedGuardianDNSName...)
+
 	linseedKeyPair, err := cm.GetOrCreateKeyPair(r.client, render.TigeraLinseedSecret, helper.TruthNamespace(), linseedDNSNames)
 	if err != nil {
 		r.status.SetDegraded(operatorv1.ResourceCreateError, "Error creating TLS certificate", err, log)

@@ -283,7 +283,7 @@ func (pr *policyRecommendationComponent) deployment() *appsv1.Deployment {
 		},
 		{
 			Name:  "LINSEED_URL",
-			Value: relasticsearch.LinseedEndpoint(pr.SupportedOSType(), pr.cfg.ClusterDomain, LinseedNamespace(pr.cfg.Tenant)),
+			Value: relasticsearch.LinseedEndpoint(pr.SupportedOSType(), pr.cfg.ClusterDomain, LinseedNamespace(pr.cfg.Tenant), pr.cfg.ManagedCluster),
 		},
 		{
 			Name:  "LINSEED_CA",

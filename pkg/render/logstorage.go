@@ -1232,7 +1232,7 @@ func (m *managedClusterLogStorage) linseedExternalService() *corev1.Service {
 		TypeMeta: metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      LinseedServiceName,
-			Namespace: ElasticsearchNamespace,
+			Namespace: common.CalicoNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Type:         corev1.ServiceTypeExternalName,
@@ -1246,7 +1246,7 @@ func (m *managedClusterLogStorage) elasticsearchExternalService() *corev1.Servic
 		TypeMeta: metav1.TypeMeta{Kind: "Service", APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ESGatewayServiceName,
-			Namespace: ElasticsearchNamespace,
+			Namespace: common.CalicoNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Type:         corev1.ServiceTypeExternalName,

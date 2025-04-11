@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2024 Tigera, Inc. All rights reserved.
+// Copyright (c) 2019-2025 Tigera, Inc. All rights reserved.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -621,7 +621,7 @@ func (c *fluentdComponent) envvars() []corev1.EnvVar {
 		{Name: "LINSEED_ENABLED", Value: "true"},
 		// Determine the namespace in which Linseed is running. For managed and standalone clusters, this is always the elasticsearch
 		// namespace. For multi-tenant management clusters, this may vary.
-		{Name: "LINSEED_ENDPOINT", Value: relasticsearch.LinseedEndpoint(c.SupportedOSType(), c.cfg.ClusterDomain, LinseedNamespace(c.cfg.Tenant))},
+		{Name: "LINSEED_ENDPOINT", Value: relasticsearch.LinseedEndpoint(c.SupportedOSType(), c.cfg.ClusterDomain, LinseedNamespace(c.cfg.Tenant), c.cfg.ManagedCluster)},
 		{Name: "LINSEED_CA_PATH", Value: c.trustedBundlePath()},
 		{Name: "TLS_KEY_PATH", Value: c.keyPath()},
 		{Name: "TLS_CRT_PATH", Value: c.certPath()},
@@ -994,7 +994,7 @@ func (c *fluentdComponent) eksLogForwarderDeployment() *appsv1.Deployment {
 		{Name: "LINSEED_ENABLED", Value: "true"},
 		// Determine the namespace in which Linseed is running. For managed and standalone clusters, this is always the elasticsearch
 		// namespace. For multi-tenant management clusters, this may vary.
-		{Name: "LINSEED_ENDPOINT", Value: relasticsearch.LinseedEndpoint(c.SupportedOSType(), c.cfg.ClusterDomain, LinseedNamespace(c.cfg.Tenant))},
+		{Name: "LINSEED_ENDPOINT", Value: relasticsearch.LinseedEndpoint(c.SupportedOSType(), c.cfg.ClusterDomain, LinseedNamespace(c.cfg.Tenant), c.cfg.ManagedCluster)},
 		{Name: "LINSEED_CA_PATH", Value: c.trustedBundlePath()},
 		{Name: "TLS_CRT_PATH", Value: c.cfg.EKSLogForwarderKeyPair.VolumeMountCertificateFilePath()},
 		{Name: "TLS_KEY_PATH", Value: c.cfg.EKSLogForwarderKeyPair.VolumeMountKeyFilePath()},

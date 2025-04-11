@@ -535,6 +535,12 @@ func (r *ReconcileManager) Reconcile(ctx context.Context, request reconcile.Requ
 		// The public cert from this keypair is sent by es-kube-controllers to managed clusters so that linseed clients in those clusters
 		// can authenticate the certificate presented by Voltron.
 		linseedDNSNames := dns.GetServiceDNSNames(render.LinseedServiceName, render.ElasticsearchNamespace, r.clusterDomain)
+
+		// Include Guardian DNS if this is a management cluster. Add a check
+		// In a managed cluster, the Elasticsearch ExternalService will be in the calico-system namespace.
+		linseedGuardianDNSName := dns.GetServiceDNSNames(render.LinseedServiceName, common.CalicoNamespace, r.clusterDomain)
+		linseedDNSNames = append(linseedDNSNames, linseedGuardianDNSName...)
+
 		linseedVoltronServerCert, err = certificateManager.GetOrCreateKeyPair(
 			r.client,
 			render.VoltronLinseedTLS,
