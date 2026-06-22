@@ -52,6 +52,7 @@ const (
 	WhiskerBackendContainerName = "whisker-backend"
 
 	WhiskerBackendKeyPairSecret = "whisker-backend-key-pair"
+	WhiskerPort                 = 8081
 	GoldmaneDeploymentName      = "goldmane"
 	GoldmaneServicePort         = 7443
 	GoldmaneNamespace           = common.CalicoNamespace
@@ -184,7 +185,7 @@ func (c *Component) whiskerService() *corev1.Service {
 			Namespace: WhiskerNamespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{Port: 8081}},
+			Ports: []corev1.ServicePort{{Port: WhiskerPort}},
 			Selector: map[string]string{
 				"k8s-app": WhiskerDeploymentName,
 			},
@@ -278,13 +279,38 @@ func (c *Component) networkPolicy() *v3.NetworkPolicy {
 	}
 	egressRules = networkpolicy.AppendDNSEgressRules(egressRules, c.cfg.OpenShift)
 
+	ingressRules := []v3.Rule{
+		{
+			Action:   v3.Allow,
+			Protocol: &networkpolicy.TCPProtocol,
+			Source: v3.EntityRule{
+				Nets: []string{"0.0.0.0/0"},
+			},
+			Destination: v3.EntityRule{
+				Ports: networkpolicy.Ports(WhiskerPort),
+			},
+		},
+		{
+			Action:   v3.Allow,
+			Protocol: &networkpolicy.TCPProtocol,
+			Source: v3.EntityRule{
+				Nets: []string{"::/0"},
+			},
+			Destination: v3.EntityRule{
+				Ports: networkpolicy.Ports(WhiskerPort),
+			},
+		},
+	}
+
 	return &v3.NetworkPolicy{
 		TypeMeta:   metav1.TypeMeta{Kind: "NetworkPolicy", APIVersion: "projectcalico.org/v3"},
 		ObjectMeta: metav1.ObjectMeta{Name: WhiskerPolicyName, Namespace: WhiskerNamespace},
 		Spec: v3.NetworkPolicySpec{
+			Order:    &networkpolicy.HighPrecedenceOrder,
 			Tier:     networkpolicy.CalicoTierName,
 			Types:    []v3.PolicyType{v3.PolicyTypeIngress, v3.PolicyTypeEgress},
 			Selector: networkpolicy.KubernetesAppSelector(WhiskerDeploymentName),
+			Ingress:  ingressRules,
 			Egress:   egressRules,
 		},
 	}
